@@ -45,7 +45,6 @@ kotlin {
             dependencies {
                 implementation("com.alexstyl:debugln:1.0.3")
                 implementation("com.github.ajalt.clikt:clikt:5.0.3")
-                implementation(libs.alexstyl.filesystem)
             }
         }
     }
