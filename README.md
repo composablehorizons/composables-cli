@@ -12,7 +12,7 @@ curl -fsSL https://composables.com/get-composables.sh | bash
 ```
 
 > [!WARNING]
-> The CLI tool has only be tested on Mac, but it should work on other platform. If you face any issues with it, kindly open an issue.
+> The CLI tool has only be tested on Mac, but it should work on other platforms. If you face any issues with it, kindly open an issue.
 
 
 ## Quick Usage
