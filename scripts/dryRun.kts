@@ -1,0 +1,13 @@
+fun runBash(command: String) {
+    val process = ProcessBuilder("bash", "-c", command).inheritIO().start()
+    process.waitFor()
+}
+
+val jarPath = "cli/build/libs/composables.jar"
+val projectRoot = "/Users/alexstyl/projects/composables-cli"
+
+runBash("cd $projectRoot && rm -rf composeApp")
+
+runBash("cd $projectRoot && ./gradlew jvmShadowJar")
+
+runBash("cd $projectRoot && java -jar $jarPath init composeApp")

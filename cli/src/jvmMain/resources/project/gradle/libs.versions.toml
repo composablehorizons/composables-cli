@@ -1,0 +1,24 @@
+[versions]
+# Compose
+compose = "1.9.1"
+composeHotReload = "1.0.0"
+
+# Kotlin
+kotlin = "2.2.20"
+
+# Android
+agp = "8.11.2"
+android-compileSdk = "36"
+android-minSdk = "24"
+android-targetSdk = "36"
+androidx-activity = "1.11.0"
+
+[libraries]
+androidx-activitycompose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+jetbrains-compose-hotreload = { id = "org.jetbrains.compose.hot-reload", version.ref = "composeHotReload" }
+jetbrains-compose = { id = "org.jetbrains.compose", version.ref = "compose" }
+jetbrains-compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+jetbrains-kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

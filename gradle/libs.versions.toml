@@ -1,0 +1,11 @@
+[versions]
+kotlin = "2.2.20"
+filesystem = "0.1.2"
+shadow = "8.3.8"
+
+[libraries]
+alexstyl-filesystem = { module = "com.alexstyl:filesystem", version.ref = "filesystem" }
+
+[plugins]
+multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
