@@ -6,18 +6,11 @@ composeHotReload = "1.0.0"
 # Kotlin
 kotlin = "2.2.20"
 
-# Android
-agp = "8.11.2"
-android-compileSdk = "36"
-android-minSdk = "24"
-android-targetSdk = "36"
-androidx-activity = "1.11.0"
-
+{{android_versions}}
 [libraries]
-androidx-activitycompose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
-
+{{android_libraries}}
 [plugins]
-android-application = { id = "com.android.application", version.ref = "agp" }
+{{android_plugins}}
 jetbrains-compose-hotreload = { id = "org.jetbrains.compose.hot-reload", version.ref = "composeHotReload" }
 jetbrains-compose = { id = "org.jetbrains.compose", version.ref = "compose" }
 jetbrains-compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
