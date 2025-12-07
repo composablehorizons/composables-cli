@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- You can now select the platforms when creating a new app.  
+
+## [0.1.1] - 2025-12-6
+
 ### Fixed
 - Fix a bug where gradle-wrapper.jar is not copied to the new app
 
