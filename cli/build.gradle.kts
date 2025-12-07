@@ -13,7 +13,8 @@ val mainClassName = "com.composables.cli.CliKt"
 val cliName = "composables"
 
 group = "com.composables"
-version = "0.1.1"
+version = libs.versions.composables.cli.toString()
+
 val organization = "composablehorizons"
 
 val projectName = "composables-cli"
