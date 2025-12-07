@@ -10,4 +10,4 @@ runBash("cd $projectRoot && rm -rf composeApp")
 
 runBash("cd $projectRoot && ./gradlew jvmShadowJar")
 
-runBash("cd $projectRoot && java -jar $jarPath init composeApp")
+runBash("cd $projectRoot && java -jar $jarPath")

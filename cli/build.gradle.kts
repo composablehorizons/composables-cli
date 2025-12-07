@@ -7,13 +7,17 @@ import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
 plugins {
     alias(libs.plugins.multiplatform)
     alias(libs.plugins.shadow)
+    id("com.github.gmazzo.buildconfig") version "6.0.6"
 }
 val mainClassName = "com.composables.cli.CliKt"
-
 val cliName = "composables"
 
 group = "com.composables"
-version = libs.versions.composables.cli.toString()
+version = libs.versions.composables.cli.get()
+
+buildConfig {
+    buildConfigField("Version", libs.versions.composables.cli.get())
+}
 
 val organization = "composablehorizons"
 

@@ -8,6 +8,7 @@ import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
+import com.github.ajalt.clikt.parameters.options.versionOption
 import java.io.File
 import java.io.InputStream
 
@@ -36,7 +37,16 @@ suspend fun main(args: Array<String>) {
 }
 
 class ComposablesCli : CliktCommand(name = "composables") {
-    override fun run() {}
+    init {
+        versionOption(
+            version = BuildConfig.Version,
+            names = setOf("-v", "--version"),
+            message = { BuildConfig.Version }
+        )
+    }
+
+    override fun run() {
+    }
 
     override fun help(context: Context) = """
         If you have any problems or need help, do not hesitate to ask for help at:
@@ -385,14 +395,17 @@ android.useAndroidX=true
                 // Build kotlin targets block
                 val kotlinTargets = mutableListOf<String>()
                 if (targets.contains("android")) {
-                    kotlinTargets.add("""    androidTarget {
+                    kotlinTargets.add(
+                        """    androidTarget {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_11)
         }
-    }""")
+    }"""
+                    )
                 }
                 if (targets.contains("ios")) {
-                    kotlinTargets.add("""    listOf(
+                    kotlinTargets.add(
+                        """    listOf(
         iosArm64(),
         iosSimulatorArm64()
     ).forEach { iosTarget ->
@@ -400,17 +413,21 @@ android.useAndroidX=true
             baseName = "ComposeApp"
             isStatic = true
         }
-    }""")
+    }"""
+                    )
                 }
                 if (targets.contains("jvm")) {
                     kotlinTargets.add("    jvm()")
                 }
                 if (targets.contains("web")) {
-                    kotlinTargets.add("""    js {
+                    kotlinTargets.add(
+                        """    js {
         browser()
         binaries.executable()
-    }""")
-                    kotlinTargets.add("""    @OptIn(ExperimentalWasmDsl::class)
+    }"""
+                    )
+                    kotlinTargets.add(
+                        """    @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
         browser {
             val rootDirPath = project.rootDir.path
@@ -427,29 +444,37 @@ android.useAndroidX=true
             }
         }
         binaries.executable()
-    }""")
+    }"""
+                    )
                 }
-                val kotlinTargetsBlock = if (kotlinTargets.isNotEmpty()) kotlinTargets.joinToString("\n\n") + "\n" else ""
+                val kotlinTargetsBlock =
+                    if (kotlinTargets.isNotEmpty()) kotlinTargets.joinToString("\n\n") + "\n" else ""
 
                 // Build sourcesets block
                 val sourcesets = mutableListOf<String>()
-                sourcesets.add("""    sourceSets {
+                sourcesets.add(
+                    """    sourceSets {
         commonMain.dependencies {
             implementation(compose.components.resources)
             implementation(compose.components.uiToolingPreview)
             implementation(compose.material3)
-        }""")
+        }"""
+                )
 
                 if (targets.contains("jvm")) {
-                    sourcesets.add("""        jvmMain.dependencies {
+                    sourcesets.add(
+                        """        jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
-        }""")
+        }"""
+                    )
                 }
                 if (targets.contains("android")) {
-                    sourcesets.add("""        androidMain.dependencies {
+                    sourcesets.add(
+                        """        androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activitycompose)
-        }""")
+        }"""
+                    )
                 }
                 sourcesets.add("    }")
                 val sourcesetsBlock = sourcesets.joinToString("\n")
@@ -457,7 +482,8 @@ android.useAndroidX=true
                 // Build configuration blocks
                 val configurations = mutableListOf<String>()
                 if (targets.contains("android")) {
-                    configurations.add("""android {
+                    configurations.add(
+                        """android {
     namespace = "{{namespace}}"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
@@ -482,10 +508,12 @@ android.useAndroidX=true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-}""")
+}"""
+                    )
                 }
                 if (targets.contains("jvm")) {
-                    configurations.add("""compose.desktop {
+                    configurations.add(
+                        """compose.desktop {
     application {
         mainClass = "{{namespace}}.MainKt"
 
@@ -495,9 +523,11 @@ android.useAndroidX=true
             packageVersion = "1.0.0"
         }
     }
-}""")
+}"""
+                    )
                 }
-                val configurationBlocksBlock = if (configurations.isNotEmpty()) configurations.joinToString("\n\n") else ""
+                val configurationBlocksBlock =
+                    if (configurations.isNotEmpty()) configurations.joinToString("\n\n") else ""
 
                 val composeDesktop = if (targets.contains("jvm")) """compose.desktop {
     application {
@@ -561,7 +591,7 @@ android.useAndroidX=true
                 // Replace remaining placeholders after blocks are built
                 updatedContent = updatedContent.replace("{{namespace}}", packageName)
                 if (content != updatedContent) {
-                    file.writeText(updatedContent.trim()+"\n")
+                    file.writeText(updatedContent.trim() + "\n")
                 }
             } catch (e: Exception) {
                 // If we can't read as text, skip this file
