@@ -4,7 +4,7 @@ compose = "1.9.1"
 composeHotReload = "1.0.0"
 
 # Kotlin
-kotlin = "2.2.20"
+kotlin = "2.2.21"
 
 {{android_versions}}
 [libraries]
