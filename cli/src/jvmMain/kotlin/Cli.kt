@@ -578,7 +578,7 @@ class Target : CliktCommand("target") {
                 "        androidMain.dependencies {",
                 "            implementation(compose.preview)",
                 "            implementation(compose.material3)",
-                "            implementation(libs.androidx.activitycompose)",
+                "            implementation(libs.androidx.activity.compose)",
                 "        }"
             )
             androidMainLines.reversed().forEach { line ->
@@ -732,17 +732,17 @@ agp = "8.11.2"
 android-compileSdk = "36"
 android-minSdk = "24"
 android-targetSdk = "36"
-androidx-activity = "1.11.0"
+activityCompose = "1.11.0"
 """
             )
         }
 
         // Add Android libraries if not present
-        if (!content.contains("androidx-activitycompose")) {
+        if (!content.contains("androidx-activity-compose")) {
             content = content.replace(
                 "[libraries]",
                 """[libraries]
-androidx-activitycompose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 """
             )
         }
@@ -1794,12 +1794,12 @@ agp = "8.11.2"
 android-compileSdk = "36"
 android-minSdk = "24"
 android-targetSdk = "36"
-androidx-activity = "1.11.0"
+activityCompose = "1.11.0"
 
 """ else ""
 
                 val androidLibraries =
-                    if (targets.contains("android")) """androidx-activitycompose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
+                    if (targets.contains("android")) """androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 
 """ else ""
 
@@ -1833,7 +1833,10 @@ android.useAndroidX=true
                 val plugins = mutableListOf<String>()
                 plugins.add("    alias(libs.plugins.jetbrains.kotlin.multiplatform)")
                 plugins.add("    alias(libs.plugins.jetbrains.compose)")
-                plugins.add("    alias(libs.plugins.jetbrains.compose.compiler)")
+                // Only add compose compiler if kotlin compose plugin is not already present
+                if (!content.contains("libs.plugins.kotlin.compose")) {
+                    plugins.add("    alias(libs.plugins.jetbrains.compose.compiler)")
+                }
                 plugins.add("    alias(libs.plugins.jetbrains.compose.hotreload)")
                 if (targets.contains("android")) {
                     plugins.add("    alias(libs.plugins.android.application)")
@@ -1932,7 +1935,7 @@ android.useAndroidX=true
                     sourcesets.add(
                         """        androidMain.dependencies {
             implementation(compose.preview)
-            implementation(libs.androidx.activitycompose)
+            implementation(libs.androidx.activity.compose)
         }"""
                     )
                 }
@@ -2003,7 +2006,7 @@ android.useAndroidX=true
 
                 val androidMainDependencies = if (targets.contains("android")) """        androidMain.dependencies {
             implementation(compose.preview)
-            implementation(libs.androidx.activitycompose)
+            implementation(libs.androidx.activity.compose)
         }""" else ""
 
                 val androidBlock = if (targets.contains("android")) """android {
@@ -2121,11 +2124,14 @@ fun updateRootBuildFile(
         if (!pluginsContent.contains("libs.plugins.jetbrains.kotlin.multiplatform")) {
             requiredPlugins.add("    alias(libs.plugins.jetbrains.kotlin.multiplatform) apply false")
         }
-        if (!pluginsContent.contains("libs.plugins.jetbrains.compose")) {
+        if (!pluginsContent.contains("libs.plugins.jetbrains.compose") && !pluginsContent.contains("libs.plugins.kotlin.compose")) {
             requiredPlugins.add("    alias(libs.plugins.jetbrains.compose) apply false")
         }
         if (!pluginsContent.contains("libs.plugins.jetbrains.compose.compiler")) {
-            requiredPlugins.add("    alias(libs.plugins.jetbrains.compose.compiler) apply false")
+            // Only add compose compiler at root level if kotlin compose plugin is not already present
+            if (!pluginsContent.contains("libs.plugins.kotlin.compose")) {
+                requiredPlugins.add("    alias(libs.plugins.jetbrains.compose.compiler) apply false")
+            }
         }
         if (!pluginsContent.contains("libs.plugins.jetbrains.compose.hotreload")) {
             requiredPlugins.add("    alias(libs.plugins.jetbrains.compose.hotreload) apply false")
@@ -2202,13 +2208,13 @@ fun updateVersionCatalog(
         if (!hasVersionVariable(versionsSection, "android-compileSdk")) newVersions.add("android-compileSdk = \"36\"")
         if (!hasVersionVariable(versionsSection, "android-minSdk")) newVersions.add("android-minSdk = \"24\"")
         if (!hasVersionVariable(versionsSection, "android-targetSdk")) newVersions.add("android-targetSdk = \"36\"")
-        if (!hasVersionVariable(versionsSection, "androidx-activity")) newVersions.add("androidx-activity = \"1.11.0\"")
+        if (!hasVersionVariable(versionsSection, "activityCompose")) newVersions.add("activityCompose = \"1.11.0\"")
     }
 
     // Add required libraries if not present
     val newLibraries = mutableListOf<String>()
-    if (targets.contains("android") && !hasLibraryVariable(librariesSection, "androidx-activitycompose")) {
-        newLibraries.add("androidx-activitycompose = { module = \"androidx.activity:activity-compose\", version.ref = \"androidx-activity\" }")
+    if (targets.contains("android") && !hasLibraryVariable(librariesSection, "androidx-activity-compose")) {
+        newLibraries.add("androidx-activity-compose = { group = \"androidx.activity\", name = \"activity-compose\", version.ref = \"activityCompose\" }")
     }
 
     // Add required plugins if not present
@@ -2463,7 +2469,10 @@ fun createModuleOnly(
                 val plugins = mutableListOf<String>()
                 plugins.add("    alias(libs.plugins.jetbrains.kotlin.multiplatform)")
                 plugins.add("    alias(libs.plugins.jetbrains.compose)")
-                plugins.add("    alias(libs.plugins.jetbrains.compose.compiler)")
+                // Only add compose compiler if kotlin compose plugin is not already present
+                if (!content.contains("libs.plugins.kotlin.compose")) {
+                    plugins.add("    alias(libs.plugins.jetbrains.compose.compiler)")
+                }
                 plugins.add("    alias(libs.plugins.jetbrains.compose.hotreload)")
                 if (targets.contains("android")) {
                     plugins.add("    alias(libs.plugins.android.application)")
@@ -2562,7 +2571,7 @@ fun createModuleOnly(
                     sourcesets.add(
                         """        androidMain.dependencies {
             implementation(compose.preview)
-            implementation(libs.androidx.activitycompose)
+            implementation(libs.androidx.activity.compose)
         }"""
                     )
                 }
