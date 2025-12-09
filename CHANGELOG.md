@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `init` can now add modules in existing Gradle Projects.
+
+## [0.3.0] - 2025-12-9
+
+### Added
 - NEW `target` command. You can now add new targets in existing Compose Multiplatform projects.
 
 ### Changed
