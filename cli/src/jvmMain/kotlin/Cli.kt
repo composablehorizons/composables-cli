@@ -2187,43 +2187,46 @@ fun updateVersionCatalog(
 
     // Add required versions if not present
     val newVersions = mutableListOf<String>()
-    if (!versionsSection.contains("kotlin")) {
-        newVersions.add("kotlin = \"2.1.0\"")
+    if (!hasVersionVariable(versionsSection, "kotlin")) {
+        newVersions.add("kotlin = \"2.2.20\"")
     }
-    if (!versionsSection.contains("compose")) {
-        newVersions.add("compose = \"2024.12.01\"")
+    if (!hasVersionVariable(versionsSection, "compose")) {
+        newVersions.add("compose = \"1.9.1\"")
+    }
+    if (!hasVersionVariable(versionsSection, "composeHotReload")) {
+        newVersions.add("composeHotReload = \"1.0.0\"")
     }
 
     // Add Android versions if android target is selected
     if (targets.contains("android")) {
-        if (!versionsSection.contains("agp")) newVersions.add("agp = \"8.11.2\"")
-        if (!versionsSection.contains("android-compileSdk")) newVersions.add("android-compileSdk = \"36\"")
-        if (!versionsSection.contains("android-minSdk")) newVersions.add("android-minSdk = \"24\"")
-        if (!versionsSection.contains("android-targetSdk")) newVersions.add("android-targetSdk = \"36\"")
-        if (!versionsSection.contains("androidx-activity")) newVersions.add("androidx-activity = \"1.11.0\"")
+        if (!hasVersionVariable(versionsSection, "agp")) newVersions.add("agp = \"8.11.2\"")
+        if (!hasVersionVariable(versionsSection, "android-compileSdk")) newVersions.add("android-compileSdk = \"36\"")
+        if (!hasVersionVariable(versionsSection, "android-minSdk")) newVersions.add("android-minSdk = \"24\"")
+        if (!hasVersionVariable(versionsSection, "android-targetSdk")) newVersions.add("android-targetSdk = \"36\"")
+        if (!hasVersionVariable(versionsSection, "androidx-activity")) newVersions.add("androidx-activity = \"1.11.0\"")
     }
 
     // Add required libraries if not present
     val newLibraries = mutableListOf<String>()
-    if (targets.contains("android") && !librariesSection.contains("androidx-activitycompose")) {
+    if (targets.contains("android") && !hasLibraryVariable(librariesSection, "androidx-activitycompose")) {
         newLibraries.add("androidx-activitycompose = { module = \"androidx.activity:activity-compose\", version.ref = \"androidx-activity\" }")
     }
 
     // Add required plugins if not present
     val newPlugins = mutableListOf<String>()
-    if (!pluginsSection.contains("jetbrains-kotlin-multiplatform")) {
+    if (!hasPluginVariable(pluginsSection, "jetbrains-kotlin-multiplatform")) {
         newPlugins.add("jetbrains-kotlin-multiplatform = { id = \"org.jetbrains.kotlin.multiplatform\", version.ref = \"kotlin\" }")
     }
-    if (!pluginsSection.contains("jetbrains-compose")) {
+    if (!hasPluginVariable(pluginsSection, "jetbrains-compose")) {
         newPlugins.add("jetbrains-compose = { id = \"org.jetbrains.compose\", version.ref = \"compose\" }")
     }
-    if (!pluginsSection.contains("jetbrains-compose-compiler")) {
+    if (!hasPluginVariable(pluginsSection, "jetbrains-compose-compiler")) {
         newPlugins.add("jetbrains-compose-compiler = { id = \"org.jetbrains.kotlin.plugin.compose\", version.ref = \"kotlin\" }")
     }
-    if (!pluginsSection.contains("jetbrains-compose-hotreload")) {
-        newPlugins.add("jetbrains-compose-hotreload = { id = \"org.jetbrains.compose.hot-reload\", version.ref = \"compose\" }")
+    if (!hasPluginVariable(pluginsSection, "jetbrains-compose-hotreload")) {
+        newPlugins.add("jetbrains-compose-hotreload = { id = \"org.jetbrains.compose.hot-reload\", version.ref = \"composeHotReload\" }")
     }
-    if (targets.contains("android") && !pluginsSection.contains("android-application")) {
+    if (targets.contains("android") && !hasPluginVariable(pluginsSection, "android-application")) {
         newPlugins.add("android-application = { id = \"com.android.application\", version.ref = \"agp\" }")
     }
 
@@ -2263,6 +2266,24 @@ private fun extractSection(content: String, sectionName: String): String {
 
     val endIndex = if (nextMatch != null) nextMatch.range.first else content.length
     return content.substring(startIndex, endIndex)
+}
+
+private fun hasVersionVariable(sectionContent: String, variableName: String): Boolean {
+    // Check for exact version variable match: variableName = "version"
+    val pattern = Regex("""^\s*$variableName\s*=""", RegexOption.MULTILINE)
+    return pattern.containsMatchIn(sectionContent)
+}
+
+private fun hasLibraryVariable(sectionContent: String, variableName: String): Boolean {
+    // Check for exact library variable match: variableName = { ... }
+    val pattern = Regex("""^\s*$variableName\s*=""", RegexOption.MULTILINE)
+    return pattern.containsMatchIn(sectionContent)
+}
+
+private fun hasPluginVariable(sectionContent: String, variableName: String): Boolean {
+    // Check for exact plugin variable match: variableName = { ... }
+    val pattern = Regex("""^\s*$variableName\s*=""", RegexOption.MULTILINE)
+    return pattern.containsMatchIn(sectionContent)
 }
 
 private fun updateSection(content: String, sectionName: String, newEntries: List<String>): String {
