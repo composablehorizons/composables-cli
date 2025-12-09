@@ -145,7 +145,7 @@ class Init : CliktCommand("init") {
             return
         }
 
-        val moduleName = readModuleName()
+        val moduleName = readModuleName(projectName)
         val appName = readAppName()
         val namespace = readNamespace()
         val targets = readTargets()
@@ -253,13 +253,18 @@ class Init : CliktCommand("init") {
         return appName.any { char -> char.isLetterOrDigit() }
     }
 
-    private fun readModuleName(): String {
+    private fun readModuleName(projectName: String): String {
         while (true) {
             print("Enter module name (default: composeApp): ")
             val moduleName = readln().trim()
 
             if (moduleName.isEmpty()) {
                 return "composeApp"
+            }
+
+            if (moduleName == projectName) {
+                echo("Module name cannot be the same as the project name \"$projectName\". Try specifying a different name.")
+                continue
             }
 
             if (!isValidModuleName(moduleName)) {
