@@ -1,5 +1,5 @@
 [versions]
-composables-cli = "0.4.3"
+composables-cli = "0.4.4"
 kotlin = "2.2.21"
 shadow = "8.3.8"
 
