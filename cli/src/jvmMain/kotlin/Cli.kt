@@ -1700,7 +1700,7 @@ fun cloneGradleProjectAndPrint(
     infoln { "\tTargets: ${targets.joinToString(", ")}" }
     infoln { "" }
 
-    debugln { "Success! Your new Compose app is ready at ${File(targetDir).absolutePath}" }
+    debugln { "Success! Your new Compose app is ready at ${File(targetDir).resolve(dirName).absolutePath}" }
     debugln { "Start by typing:" }
     infoln { "" }
     infoln { "\tcd $dirName" }
