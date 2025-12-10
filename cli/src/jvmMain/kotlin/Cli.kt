@@ -200,15 +200,15 @@ class Init : CliktCommand("init") {
             }
         }
 
-        if (!target.mkdirs()) {
-            echo("Failed to create directory $projectName")
-            return
-        }
-
         val moduleName = readModuleName(projectName)
         val appName = readAppName()
         val namespace = readNamespace()
         val targets = readTargets()
+
+        if (!target.mkdirs()) {
+            echo("Failed to create directory $projectName")
+            return
+        }
 
         cloneGradleProjectAndPrint(
             targetDir = workingDir,
