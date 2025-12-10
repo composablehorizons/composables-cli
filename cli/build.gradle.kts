@@ -52,9 +52,7 @@ kotlin {
                 implementation("com.github.ajalt.clikt:clikt:5.0.3")
             }
         }
-        val jvmMain by getting {
-            resources.srcDir("src/jvmMain/resources")
-        }
+
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test"))
@@ -73,6 +71,9 @@ fun registerShadowJar(targetName: String) {
                 val shadowJar = register<ShadowJar>("${targetName}ShadowJar") {
                     group = "build"
                     from(output)
+                    from("src/jvmMain/resources/project") {
+                        into("project")
+                    }
                     configurations = listOf(runtimeDependencyFiles)
 
                     archiveFileName.set("$cliName.jar")
