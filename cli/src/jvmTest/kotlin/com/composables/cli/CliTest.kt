@@ -42,13 +42,18 @@ class CliTest {
             val appContent = appFile.readText()
 
             assertThat(buildContent).contains("jvm()")
+            assertThat(buildContent).contains("implementation(libs.composables.ui)")
             assertThat(buildContent).doesNotContain("androidTarget {")
             assertThat(buildContent).doesNotContain("iosArm64()")
             assertThat(buildContent).doesNotContain("wasmJs {")
+            assertThat(buildContent).doesNotContain("compose.material3")
             assertThat(buildContent).contains("mainClass = \"com.composables.demo.MainKt\"")
             assertThat(buildContent).doesNotContain("{{module_name}}")
 
             assertThat(appContent).contains("package com.composables.demo")
+            assertThat(appContent).contains("Hello Beautiful World!")
+            assertThat(appContent).contains("Go to App.kt to edit your app")
+            assertThat(appContent).contains("Pro tip: Use the `dev` configuration in your IDE to auto-reload your app when you edit your code")
             assertThat(appContent).doesNotContain("{{app_name}}")
             assertThat(appContent).doesNotContain("{{namespace}}")
         }
@@ -99,11 +104,13 @@ class CliTest {
 
             val content = File(targetDir, "gradle/libs.versions.toml").readText()
 
-            assertThat(content.countOccurrences("""agp = "8.11.2"""")).isEqualTo(1)
+            assertThat(content.countOccurrences("""agp = "9.0.0"""")).isEqualTo(1)
             assertThat(content.countOccurrences("""androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }""")).isEqualTo(1)
+            assertThat(content.countOccurrences("""composables-ui = { group = "com.composables", name = "ui", version.ref = "composablesUi" }""")).isEqualTo(1)
             assertThat(content.countOccurrences("""android-application = { id = "com.android.application", version.ref = "agp" }""")).isEqualTo(1)
-            assertThat(content).contains("""compose = "1.9.1"""")
-            assertThat(content).contains("""composeHotReload = "1.0.0"""")
+            assertThat(content).contains("""compose = "1.11.1"""")
+            assertThat(content).contains("""composeHotReload = "1.1.0"""")
+            assertThat(content).contains("""composablesUi = "0.1.0"""")
         }
     }
 

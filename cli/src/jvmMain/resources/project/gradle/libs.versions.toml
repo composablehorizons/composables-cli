@@ -1,13 +1,15 @@
 [versions]
 # Compose
-compose = "1.9.1"
-composeHotReload = "1.0.0"
+compose = "1.11.1"
+composeHotReload = "1.1.0"
+composablesUi = "0.1.0"
 
 # Kotlin
-kotlin = "2.2.21"
+kotlin = "2.4.0"
 
 {{android_versions}}
 [libraries]
+composables-ui = { group = "com.composables", name = "ui", version.ref = "composablesUi" }
 {{android_libraries}}
 [plugins]
 {{android_plugins}}

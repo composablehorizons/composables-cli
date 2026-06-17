@@ -162,7 +162,7 @@ class Init : CliktCommand("init") {
                     // Check Kotlin version
                     val kotlinVersion = getKotlinVersion(target)
                     if (kotlinVersion != null && !isKotlinVersionSupported(kotlinVersion)) {
-                        echo("Kotlin version $kotlinVersion is not supported. At least version 2.2.21 is required.")
+                        echo("Kotlin version $kotlinVersion is not supported. At least version 2.4.0 is required.")
                         echo("Please update your Kotlin version and try again.")
                         return
                     }
@@ -518,7 +518,8 @@ class Target : CliktCommand("target") {
         val composeDependencies = listOf(
             "compose.components.resources",
             "compose.components.uiToolingPreview",
-            "compose.material3",
+            "libs.composables.ui",
+            "com.composables:ui:",
             "compose.desktop.currentOs",
             "compose.preview",
             "compose.runtime"
@@ -624,7 +625,7 @@ class Target : CliktCommand("target") {
                 "",
                 "    androidTarget {",
                 "        compilerOptions {",
-                "            jvmTarget.set(JvmTarget.JVM_11)",
+                "            jvmTarget.set(JvmTarget.JVM_17)",
                 "        }",
                 "    }"
             )
@@ -640,7 +641,7 @@ class Target : CliktCommand("target") {
                 "",
                 "        androidMain.dependencies {",
                 "            implementation(compose.preview)",
-                "            implementation(compose.material3)",
+                "            implementation(\"com.composables:ui:0.1.0\")",
                 "            implementation(libs.androidx.activity.compose)",
                 "        }"
             )
@@ -675,8 +676,8 @@ class Target : CliktCommand("target") {
             "        }",
             "    }",
             "    compileOptions {",
-            "        sourceCompatibility = JavaVersion.VERSION_11",
-            "        targetCompatibility = JavaVersion.VERSION_11",
+            "        sourceCompatibility = JavaVersion.VERSION_17",
+            "        targetCompatibility = JavaVersion.VERSION_17",
             "    }",
             "}"
         )
@@ -791,11 +792,11 @@ class Target : CliktCommand("target") {
                 "[versions]",
                 """[versions]
 # Android
-agp = "8.11.2"
-android-compileSdk = "36"
-android-minSdk = "24"
-android-targetSdk = "36"
-activityCompose = "1.11.0"
+agp = "9.0.0"
+android-compileSdk = "37"
+android-minSdk = "23"
+android-targetSdk = "37"
+activityCompose = "1.13.0"
 """
             )
         }
@@ -857,14 +858,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.composables.ui.components.Text
+import com.composables.ui.theme.ComposablesTheme
 import androidx.compose.ui.tooling.preview.Preview
 
 class MainActivity : ComponentActivity() {
@@ -878,30 +878,30 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AndroidApp() {
-    MaterialTheme {
-        Scaffold {
-            Box(
-                modifier = Modifier
-                    .safeDrawingPadding()
-                    .fillMaxSize()
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
+    ComposablesTheme {
+        Box(
+            modifier = Modifier
+                .safeDrawingPadding()
+                .fillMaxSize()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
-                ) {
-                    Text(
-                        text = "Hello Beautiful World!",
-                        style = MaterialTheme.typography.displayLarge,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = "Go to MainActivity.kt to edit your app",
-                        style = MaterialTheme.typography.displayMedium,
-                        textAlign = TextAlign.Center
-                    )
-                }
+                Text(
+                    text = "Hello Beautiful World!",
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = "Go to MainActivity.kt to edit your app",
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = "Pro tip: Use the `dev` configuration in your IDE to auto-reload your app when you edit your code",
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }
@@ -1038,7 +1038,7 @@ fun DefaultPreview() {
                 "",
                 "        jvmMain.dependencies {",
                 "            implementation(compose.desktop.currentOs)",
-                "            implementation(compose.material3)",
+                "            implementation(\"com.composables:ui:0.1.0\")",
                 "        }"
             )
             jvmMainLines.reversed().forEach { line ->
@@ -1090,16 +1090,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.singleWindowApplication
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import com.composables.ui.components.Text
+import com.composables.ui.theme.ComposablesTheme
+import androidx.compose.ui.tooling.preview.Preview
 
 fun main() = singleWindowApplication {
     DesktopApp()
@@ -1107,30 +1106,30 @@ fun main() = singleWindowApplication {
 
 @Composable
 fun DesktopApp() {
-    MaterialTheme {
-        Scaffold {
-            Box(
-                modifier = Modifier
-                    .safeDrawingPadding()
-                    .fillMaxSize()
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
+    ComposablesTheme {
+        Box(
+            modifier = Modifier
+                .safeDrawingPadding()
+                .fillMaxSize()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
-                ) {
-                    Text(
-                        text = "Hello Beautiful World!",
-                        style = MaterialTheme.typography.displayLarge,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = "Go to main.desktop.kt to edit your app",
-                        style = MaterialTheme.typography.displayMedium,
-                        textAlign = TextAlign.Center
-                    )
-                }
+                Text(
+                    text = "Hello Beautiful World!",
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = "Go to main.desktop.kt to edit your app",
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = "Pro tip: Use the `dev` configuration in your IDE to auto-reload your app when you edit your code",
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }
@@ -1177,7 +1176,7 @@ fun DesktopAppPreview() {
             val iosMainLines = listOf(
                 "",
                 "        iosMain.dependencies {",
-                "            implementation(compose.material3)",
+                "            implementation(\"com.composables:ui:0.1.0\")",
                 "        }"
             )
             iosMainLines.reversed().forEach { line ->
@@ -1228,45 +1227,44 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.window.ComposeUIViewController
+import com.composables.ui.components.Text
+import com.composables.ui.theme.ComposablesTheme
 
 fun MainViewController() = ComposeUIViewController { IosApp() }
 
 @Composable
 fun IosApp() {
-    MaterialTheme {
-        Scaffold {
-            Box(
-                modifier = Modifier
-                    .safeDrawingPadding()
-                    .fillMaxSize()
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
+    ComposablesTheme {
+        Box(
+            modifier = Modifier
+                .safeDrawingPadding()
+                .fillMaxSize()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
-                ) {
-                    Text(
-                        text = "Hello Beautiful World!",
-                        style = MaterialTheme.typography.displayLarge,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = "Go to MainViewController.kt to edit your app",
-                        style = MaterialTheme.typography.displayMedium,
-                        textAlign = TextAlign.Center
-                    )
-                }
+                Text(
+                    text = "Hello Beautiful World!",
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = "Go to MainViewController.kt to edit your app",
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = "Pro tip: Use the `dev` configuration in your IDE to auto-reload your app when you edit your code",
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }
@@ -1363,7 +1361,7 @@ fun IosAppPreview() {
             val webMainLines = listOf(
                 "",
                 "        jsMain.dependencies {",
-                "            implementation(compose.material3)",
+                "            implementation(\"com.composables:ui:0.1.0\")",
                 "        }"
             )
             webMainLines.reversed().forEach { line ->
@@ -1398,9 +1396,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -1408,7 +1403,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import com.composables.ui.components.Text
+import com.composables.ui.theme.ComposablesTheme
+import androidx.compose.ui.tooling.preview.Preview
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
@@ -1419,30 +1416,30 @@ fun main() {
 
 @Composable
 fun WebApp() {
-    MaterialTheme {
-        Scaffold {
-            Box(
-                modifier = Modifier
-                    .safeDrawingPadding()
-                    .fillMaxSize()
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
+    ComposablesTheme {
+        Box(
+            modifier = Modifier
+                .safeDrawingPadding()
+                .fillMaxSize()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
-                ) {
-                    Text(
-                        text = "Hello Beautiful World!",
-                        style = MaterialTheme.typography.displayLarge,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = "Go to main.web.kt to edit your app",
-                        style = MaterialTheme.typography.displayMedium,
-                        textAlign = TextAlign.Center
-                    )
-                }
+                Text(
+                    text = "Hello Beautiful World!",
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = "Go to main.web.kt to edit your app",
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = "Pro tip: Use the `dev` configuration in your IDE to auto-reload your app when you edit your code",
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }
@@ -1854,11 +1851,11 @@ fun cloneGradleProject(
                 var updatedContent = content.replace("{{app_name}}", appName)
 
                 val androidVersions = if (targets.contains("android")) """# Android
-agp = "8.11.2"
-android-compileSdk = "36"
-android-minSdk = "24"
-android-targetSdk = "36"
-activityCompose = "1.11.0"
+agp = "9.0.0"
+android-compileSdk = "37"
+android-minSdk = "23"
+android-targetSdk = "37"
+activityCompose = "1.13.0"
 
 """ else ""
 
@@ -1913,7 +1910,7 @@ android.useAndroidX=true
                     kotlinTargets.add(
                         """    androidTarget {
         compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_11)
+            jvmTarget.set(JvmTarget.JVM_17)
         }
     }"""
                     )
@@ -1984,7 +1981,7 @@ android.useAndroidX=true
                     """    sourceSets {
         commonMain.dependencies {
             implementation(compose.components.uiToolingPreview)
-            implementation(compose.material3)
+            implementation(libs.composables.ui)
         }"""
                 )
 
@@ -2032,8 +2029,8 @@ android.useAndroidX=true
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }"""
                     )
@@ -2095,8 +2092,8 @@ android.useAndroidX=true
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
@@ -2257,26 +2254,32 @@ fun updateVersionCatalog(
     // Add required versions if not present
     val newVersions = mutableListOf<String>()
     if (!hasVersionVariable(versionsSection, "kotlin")) {
-        newVersions.add("kotlin = \"2.2.20\"")
+        newVersions.add("kotlin = \"2.4.0\"")
     }
     if (!hasVersionVariable(versionsSection, "compose")) {
-        newVersions.add("compose = \"1.9.1\"")
+        newVersions.add("compose = \"1.11.1\"")
     }
     if (!hasVersionVariable(versionsSection, "composeHotReload")) {
-        newVersions.add("composeHotReload = \"1.0.0\"")
+        newVersions.add("composeHotReload = \"1.1.0\"")
+    }
+    if (!hasVersionVariable(versionsSection, "composablesUi")) {
+        newVersions.add("composablesUi = \"0.1.0\"")
     }
 
     // Add Android versions if android target is selected
     if (targets.contains("android")) {
-        if (!hasVersionVariable(versionsSection, "agp")) newVersions.add("agp = \"8.11.2\"")
-        if (!hasVersionVariable(versionsSection, "android-compileSdk")) newVersions.add("android-compileSdk = \"36\"")
-        if (!hasVersionVariable(versionsSection, "android-minSdk")) newVersions.add("android-minSdk = \"24\"")
-        if (!hasVersionVariable(versionsSection, "android-targetSdk")) newVersions.add("android-targetSdk = \"36\"")
-        if (!hasVersionVariable(versionsSection, "activityCompose")) newVersions.add("activityCompose = \"1.11.0\"")
+        if (!hasVersionVariable(versionsSection, "agp")) newVersions.add("agp = \"9.0.0\"")
+        if (!hasVersionVariable(versionsSection, "android-compileSdk")) newVersions.add("android-compileSdk = \"37\"")
+        if (!hasVersionVariable(versionsSection, "android-minSdk")) newVersions.add("android-minSdk = \"23\"")
+        if (!hasVersionVariable(versionsSection, "android-targetSdk")) newVersions.add("android-targetSdk = \"37\"")
+        if (!hasVersionVariable(versionsSection, "activityCompose")) newVersions.add("activityCompose = \"1.13.0\"")
     }
 
     // Add required libraries if not present
     val newLibraries = mutableListOf<String>()
+    if (!hasLibraryVariable(librariesSection, "composables-ui")) {
+        newLibraries.add("composables-ui = { group = \"com.composables\", name = \"ui\", version.ref = \"composablesUi\" }")
+    }
     if (targets.contains("android") && !hasLibraryVariable(librariesSection, "androidx-activity-compose")) {
         newLibraries.add("androidx-activity-compose = { group = \"androidx.activity\", name = \"activity-compose\", version.ref = \"activityCompose\" }")
     }
@@ -2549,7 +2552,7 @@ fun createModuleOnly(
                     kotlinTargets.add(
                         """    androidTarget {
         compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_11)
+            jvmTarget.set(JvmTarget.JVM_17)
         }
     }"""
                     )
@@ -2620,7 +2623,7 @@ fun createModuleOnly(
                     """    sourceSets {
         commonMain.dependencies {
             implementation(compose.components.uiToolingPreview)
-            implementation(compose.material3)
+            implementation(libs.composables.ui)
         }"""
                 )
 
@@ -2668,8 +2671,8 @@ fun createModuleOnly(
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }"""
                     )
@@ -2860,12 +2863,12 @@ private fun isKotlinVersionSupported(version: String): Boolean {
             val minor = parts[1].toInt()
             val patch = parts[2].toInt()
 
-            // Check if version is at least 2.2.21
+            // Check if version is at least 2.4.0
             if (major > 2) return true
             if (major < 2) return false
-            if (minor > 2) return true
-            if (minor < 2) return false
-            if (patch >= 21) return true
+            if (minor > 4) return true
+            if (minor < 4) return false
+            if (patch >= 0) return true
             return false
         } else {
             // For versions like "2.2" or "2.2.0", assume they're too old
