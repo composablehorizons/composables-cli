@@ -28,6 +28,7 @@ class CliTest {
 
             val projectDir = File(targetDir, "newApp")
             val buildFile = File(projectDir, "desktopApp/build.gradle.kts")
+            val rootBuildFile = File(projectDir, "build.gradle.kts")
             val appFile = File(projectDir, "desktopApp/src/commonMain/kotlin/com/composables/demo/App.kt")
 
             assertThat(projectDir.isDirectory, "Generated project directory should exist").isTrue()
@@ -39,6 +40,7 @@ class CliTest {
             assertThat(File(projectDir, "desktopApp/src/webMain").exists(), "Web sources should be omitted for JVM-only template runs").isFalse()
 
             val buildContent = buildFile.readText()
+            val rootBuildContent = rootBuildFile.readText()
             val appContent = appFile.readText()
 
             assertThat(buildContent).contains("jvm()")
@@ -49,6 +51,13 @@ class CliTest {
             assertThat(buildContent).doesNotContain("compose.material3")
             assertThat(buildContent).contains("mainClass = \"com.composables.demo.MainKt\"")
             assertThat(buildContent).doesNotContain("{{module_name}}")
+
+            assertThat(rootBuildContent).contains("composeCompatibilityBrowserDistribution")
+            assertThat(rootBuildContent).contains("jsBrowserDistribution")
+            assertThat(rootBuildContent).contains("wasmJsBrowserDistribution")
+            assertThat(rootBuildContent).contains("compose-web-compatibility-preloads")
+            assertThat(rootBuildContent).contains("js-preloads")
+            assertThat(rootBuildContent).contains("wasm-preloads")
 
             assertThat(appContent).contains("package com.composables.demo")
             assertThat(appContent).contains("Hello Beautiful World!")
