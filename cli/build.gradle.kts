@@ -56,6 +56,7 @@ kotlin {
 
         val jvmTest by getting {
             dependencies {
+                implementation("com.willowtreeapps.assertk:assertk:0.28.1")
                 implementation(kotlin("test"))
             }
         }
