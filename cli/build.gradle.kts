@@ -1,6 +1,7 @@
 @file:Suppress("UnstableApiUsage")
 
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import org.gradle.api.tasks.JavaExec
 import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
 
 
@@ -92,3 +93,33 @@ fun registerShadowJar(targetName: String) {
 }
 
 registerShadowJar("jvm")
+
+val devTemplateOutputDir = layout.buildDirectory.dir("dev-template")
+
+tasks.register<JavaExec>("renderTemplate") {
+    group = "application"
+    description = "Renders the bundled project template into build/dev-template/app for local JVM template development."
+
+    dependsOn("jvmJar")
+
+    mainClass.set("com.composables.cli.DevTemplateKt")
+    classpath(
+        tasks.named("jvmJar"),
+        configurations.getByName("jvmRuntimeClasspath")
+    )
+
+    systemProperty("composables.template.outputRoot", devTemplateOutputDir.get().asFile.absolutePath)
+    systemProperty("composables.template.projectDir", "app")
+    systemProperty("composables.template.targets", "jvm")
+}
+
+tasks.register<Exec>("runTemplate") {
+    group = "application"
+    description = "Renders the bundled project template and runs its JVM target locally."
+
+    dependsOn("renderTemplate")
+
+    val renderedProjectDir = devTemplateOutputDir.map { it.dir("app") }
+    workingDir(renderedProjectDir)
+    commandLine("./gradlew", "run")
+}
