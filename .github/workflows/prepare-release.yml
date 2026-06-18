@@ -2,6 +2,11 @@ name: Prepare Release
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish
+        required: true
+        type: string
   push:
     tags:
       - '*'
@@ -17,17 +22,41 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - run: git fetch --tags -f
 
       - name: Resolve version
         id: vars
         run: |
-          TAG_NAME=$(git describe --tags --abbrev=0)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="${{ inputs.tag }}"
+          else
+            TAG_NAME="${GITHUB_REF_NAME}"
+          fi
           VERSION=${TAG_NAME#v}
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "Version: $VERSION"
+
+      - name: Validate release metadata
+        run: |
+          ACTUAL_VERSION=$(sed -n 's/^composables-cli = "\(.*\)"$/\1/p' gradle/libs.versions.toml)
+
+          if [ -z "$ACTUAL_VERSION" ]; then
+            echo "Failed to resolve version from gradle/libs.versions.toml" >&2
+            exit 1
+          fi
+
+          if [ "$ACTUAL_VERSION" != "$VERSION" ]; then
+            echo "Tag version '$VERSION' does not match gradle/libs.versions.toml version '$ACTUAL_VERSION'" >&2
+            exit 1
+          fi
+
+          if ! grep -q "^## \[$VERSION\]" CHANGELOG.md; then
+            echo "CHANGELOG.md is missing a '## [$VERSION]' heading" >&2
+            exit 1
+          fi
 
       - name: Generate CHANGELOG content
         run: |
@@ -56,7 +85,7 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Build Shadow JAR
-        run: ./gradlew jvmShadowJar --no-daemon
+        run: ./gradlew check jvmShadowJar --no-daemon
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
