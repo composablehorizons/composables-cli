@@ -30,7 +30,7 @@ class ComposablesCli : CliktCommand(name = "composables") {
         versionOption(
             version = BuildConfig.Version,
             names = setOf("-v", "--version"),
-            message = { BuildConfig.Version }
+            message = { BuildConfig.Version },
         )
     }
 
@@ -64,7 +64,7 @@ class Update : CliktCommand("update") {
             val latestVersion = ProcessBuilder(
                 "bash",
                 "-c",
-                "curl -s https://api.github.com/repos/composablehorizons/composables-cli/releases/latest | grep '\"tag_name\":' | sed -E 's/.*\"([^\"]+)\".*/\\1/'"
+                "curl -s https://api.github.com/repos/composablehorizons/composables-cli/releases/latest | grep '\"tag_name\":' | sed -E 's/.*\"([^\"]+)\".*/\\1/'",
             )
                 .redirectErrorStream(true)
                 .start()
@@ -81,9 +81,11 @@ class Update : CliktCommand("update") {
             echo("Downloading...")
 
             val downloadProcess = ProcessBuilder(
-                "curl", "-fSL",
+                "curl",
+                "-fSL",
                 "https://github.com/composablehorizons/composables-cli/releases/download/$latestVersion/composables.jar",
-                "-o", tempJar.absolutePath
+                "-o",
+                tempJar.absolutePath,
             ).inheritIO().start()
 
             val downloadExitCode = downloadProcess.waitFor()
@@ -113,7 +115,6 @@ class Update : CliktCommand("update") {
 
             echo("✓ Update completed successfully!")
             echo("Note: Restart your terminal to use the new version")
-
         } catch (e: Exception) {
             echo("Failed to run update: ${e.message}", err = true)
         }
@@ -147,9 +148,9 @@ class Init : CliktCommand("init") {
             } else {
                 // Check if it's a Gradle project
                 val isGradleProject = File(target, "build.gradle.kts").exists() ||
-                        File(target, "build.gradle").exists() ||
-                        File(target, "settings.gradle.kts").exists() ||
-                        File(target, "settings.gradle").exists()
+                    File(target, "build.gradle").exists() ||
+                    File(target, "settings.gradle.kts").exists() ||
+                    File(target, "settings.gradle").exists()
 
                 if (isGradleProject) {
                     echo("Gradle project detected. This will add a new module to your existing project. Is this what you want? y/n ", trailingNewline = false)
@@ -178,7 +179,7 @@ class Init : CliktCommand("init") {
                         moduleName = moduleName,
                         packageName = namespace,
                         appName = appName,
-                        targets = targets
+                        targets = targets,
                     )
 
                     // Add module to settings.gradle.kts
@@ -220,7 +221,7 @@ class Init : CliktCommand("init") {
             packageName = namespace,
             appName = appName,
             targets = targets,
-            moduleName = moduleName
+            moduleName = moduleName,
         )
     }
 
@@ -372,7 +373,7 @@ class Init : CliktCommand("init") {
 
         // Check if it contains at least one letter or digit
         return moduleName.any { char -> char.isLetterOrDigit() } &&
-                moduleName.all { char -> char.isLetterOrDigit() || char == '-' || char == '_' }
+            moduleName.all { char -> char.isLetterOrDigit() || char == '-' || char == '_' }
     }
 
     private fun isValidPackageName(packageName: String): Boolean {
@@ -384,23 +385,21 @@ class Init : CliktCommand("init") {
         // Check each part is a valid Java identifier
         return parts.all { part ->
             part.isNotEmpty() &&
-                    part[0].isLetter() &&
-                    part.all { char -> char.isLetterOrDigit() || char == '_' }
+                part[0].isLetter() &&
+                part.all { char -> char.isLetterOrDigit() || char == '_' }
         }
     }
 }
 
-private fun toCamelCase(input: String): String {
-    return input.split(Regex("[-_]"))
-        .mapIndexed { index, part ->
-            if (index == 0) {
-                part.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
-            } else {
-                part.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
-            }
+private fun toCamelCase(input: String): String = input.split(Regex("[-_]"))
+    .mapIndexed { index, part ->
+        if (index == 0) {
+            part.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        } else {
+            part.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
         }
-        .joinToString("")
-}
+    }
+    .joinToString("")
 
 class Target : CliktCommand("target") {
     override fun help(context: Context): String = """
@@ -522,7 +521,7 @@ class Target : CliktCommand("target") {
             "com.composables:ui:",
             "compose.desktop.currentOs",
             "compose.preview",
-            "compose.runtime"
+            "compose.runtime",
         )
 
         return composeDependencies.any { dependency ->
@@ -627,7 +626,7 @@ class Target : CliktCommand("target") {
                 "        compilerOptions {",
                 "            jvmTarget.set(JvmTarget.JVM_17)",
                 "        }",
-                "    }"
+                "    }",
             )
             androidTargetLines.reversed().forEach { line ->
                 lines.add(kotlinCloseIndex, line)
@@ -643,7 +642,7 @@ class Target : CliktCommand("target") {
                 "            implementation(compose.preview)",
                 "            implementation(\"com.composables:ui:0.1.0\")",
                 "            implementation(libs.androidx.activity.compose)",
-                "        }"
+                "        }",
             )
             androidMainLines.reversed().forEach { line ->
                 lines.add(sourceSetsCloseIndex, line)
@@ -679,7 +678,7 @@ class Target : CliktCommand("target") {
             "        sourceCompatibility = JavaVersion.VERSION_17",
             "        targetCompatibility = JavaVersion.VERSION_17",
             "    }",
-            "}"
+            "}",
         )
         lines.addAll(androidBlock)
 
@@ -797,7 +796,7 @@ android-compileSdk = "37"
 android-minSdk = "23"
 android-targetSdk = "37"
 activityCompose = "1.13.0"
-"""
+""",
             )
         }
 
@@ -807,7 +806,7 @@ activityCompose = "1.13.0"
                 "[libraries]",
                 """[libraries]
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
-"""
+""",
             )
         }
 
@@ -817,7 +816,7 @@ androidx-activity-compose = { group = "androidx.activity", name = "activity-comp
                 "[plugins]",
                 """[plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-"""
+""",
             )
         }
 
@@ -1039,7 +1038,7 @@ fun DefaultPreview() {
                 "        jvmMain.dependencies {",
                 "            implementation(compose.desktop.currentOs)",
                 "            implementation(\"com.composables:ui:0.1.0\")",
-                "        }"
+                "        }",
             )
             jvmMainLines.reversed().forEach { line ->
                 lines.add(sourceSetsCloseIndex, line)
@@ -1052,7 +1051,7 @@ fun DefaultPreview() {
             "",
             "compose.desktop {",
             "    application {",
-            "        mainClass = \"${namespace}.MainKt\"",
+            "        mainClass = \"$namespace.MainKt\"",
             "",
             "        nativeDistributions {",
             "            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)",
@@ -1060,7 +1059,7 @@ fun DefaultPreview() {
             "            packageVersion = \"1.0.0\"",
             "        }",
             "    }",
-            "}"
+            "}",
         )
         lines.addAll(desktopBlock)
 
@@ -1163,7 +1162,7 @@ fun DesktopAppPreview() {
                 "            baseName = \"$baseName\"",
                 "            isStatic = true",
                 "        }",
-                "    }"
+                "    }",
             )
             iosTargetLines.reversed().forEach { line ->
                 lines.add(kotlinCloseIndex, line)
@@ -1177,7 +1176,7 @@ fun DesktopAppPreview() {
                 "",
                 "        iosMain.dependencies {",
                 "            implementation(\"com.composables:ui:0.1.0\")",
-                "        }"
+                "        }",
             )
             iosMainLines.reversed().forEach { line ->
                 lines.add(sourceSetsCloseIndex, line)
@@ -1348,7 +1347,7 @@ fun IosAppPreview() {
                 "            }",
                 "        }",
                 "        binaries.executable()",
-                "    }"
+                "    }",
             )
             webTargetLines.reversed().forEach { line ->
                 lines.add(kotlinCloseIndex, line)
@@ -1362,7 +1361,7 @@ fun IosAppPreview() {
                 "",
                 "        jsMain.dependencies {",
                 "            implementation(\"com.composables:ui:0.1.0\")",
-                "        }"
+                "        }",
             )
             webMainLines.reversed().forEach { line ->
                 lines.add(sourceSetsCloseIndex, line)
@@ -1641,9 +1640,13 @@ fun WebAppPreview() {
             copyResource(resourcePath, targetFile)
 
             // Replace placeholders in text files
-            if (targetFile.name.endsWith(".swift") || targetFile.name.endsWith(".h") || targetFile.name.endsWith(".m") || targetFile.name.endsWith(
-                    ".pbxproj"
-                ) || targetFile.name.endsWith(".xcconfig")
+            if (targetFile.name.endsWith(".swift") ||
+                targetFile.name.endsWith(".h") ||
+                targetFile.name.endsWith(".m") ||
+                targetFile.name.endsWith(
+                    ".pbxproj",
+                ) ||
+                targetFile.name.endsWith(".xcconfig")
             ) {
                 try {
                     val content = targetFile.readText()
@@ -1666,10 +1669,11 @@ fun WebAppPreview() {
 
 val gradleScript: String
     get() {
-        return if (System.getProperty("os.name").lowercase().contains("win"))
+        return if (System.getProperty("os.name").lowercase().contains("win")) {
             "gradlew.bat"
-        else
+        } else {
             "./gradlew"
+        }
     }
 
 fun cloneGradleProjectAndPrint(
@@ -1678,7 +1682,7 @@ fun cloneGradleProjectAndPrint(
     packageName: String,
     appName: String,
     targets: Set<String>,
-    moduleName: String
+    moduleName: String,
 ) {
     cloneGradleProject(
         targetDir,
@@ -1686,7 +1690,7 @@ fun cloneGradleProjectAndPrint(
         packageName,
         appName,
         targets,
-        moduleName
+        moduleName,
     )
     // Log project configuration summary
     infoln { "" }
@@ -1706,14 +1710,13 @@ fun cloneGradleProjectAndPrint(
     debugln { "Happy coding!" }
 }
 
-
 fun cloneGradleProject(
     targetDir: String,
     dirName: String,
     packageName: String,
     appName: String,
     targets: Set<String>,
-    moduleName: String
+    moduleName: String,
 ) {
     val target = File(targetDir).resolve(dirName)
 
@@ -1755,7 +1758,7 @@ fun cloneGradleProject(
                     // Development mode - read from filesystem
                     val dir = File(resourceUrl.toURI())
                     dir.walkTopDown().forEach { file ->
-                        if (file.isFile) {  // Only include files, not directories
+                        if (file.isFile) { // Only include files, not directories
                             val relativePath = file.relativeTo(dir)
                             resources.add("$path/${relativePath.path}")
                         }
@@ -1850,31 +1853,47 @@ fun cloneGradleProject(
                 val content = file.readText()
                 var updatedContent = content.replace("{{app_name}}", appName)
 
-                val androidVersions = if (targets.contains("android")) """# Android
+                val androidVersions = if (targets.contains("android")) {
+                    """# Android
 agp = "9.0.0"
 android-compileSdk = "37"
 android-minSdk = "23"
 android-targetSdk = "37"
 activityCompose = "1.13.0"
 
-""" else ""
+"""
+                } else {
+                    ""
+                }
 
                 val androidLibraries =
-                    if (targets.contains("android")) """androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+                    if (targets.contains("android")) {
+                        """androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 
-""" else ""
+"""
+                    } else {
+                        ""
+                    }
 
                 val androidPlugins =
                     if (targets.contains("android")) """android-application = { id = "com.android.application", version.ref = "agp" }""" else ""
 
                 val androidPlugin =
-                    if (targets.contains("android")) """    alias(libs.plugins.android.application) apply false
-""" else ""
+                    if (targets.contains("android")) {
+                        """    alias(libs.plugins.android.application) apply false
+"""
+                    } else {
+                        ""
+                    }
 
-                val androidProperties = if (targets.contains("android")) """#Android
+                val androidProperties = if (targets.contains("android")) {
+                    """#Android
 android.nonTransitiveRClass=true
 android.useAndroidX=true
-""" else ""
+"""
+                } else {
+                    ""
+                }
 
                 // Build imports block
                 val imports = mutableListOf<String>()
@@ -1912,7 +1931,7 @@ android.useAndroidX=true
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
-    }"""
+    }""",
                     )
                 }
                 if (targets.contains("ios")) {
@@ -1926,7 +1945,7 @@ android.useAndroidX=true
             baseName = "$baseName"
             isStatic = true
         }
-    }"""
+    }""",
                     )
                 }
                 if (targets.contains("jvm")) {
@@ -1949,7 +1968,7 @@ android.useAndroidX=true
             }
         }
         binaries.executable()
-    }"""
+    }""",
                     )
                     kotlinTargets.add(
                         """    @OptIn(ExperimentalWasmDsl::class)
@@ -1969,7 +1988,7 @@ android.useAndroidX=true
             }
         }
         binaries.executable()
-    }"""
+    }""",
                     )
                 }
                 val kotlinTargetsBlock =
@@ -1982,14 +2001,14 @@ android.useAndroidX=true
         commonMain.dependencies {
             implementation(compose.components.uiToolingPreview)
             implementation(libs.composables.ui)
-        }"""
+        }""",
                 )
 
                 if (targets.contains("jvm")) {
                     sourcesets.add(
                         """        jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
-        }"""
+        }""",
                     )
                 }
                 if (targets.contains("android")) {
@@ -1997,7 +2016,7 @@ android.useAndroidX=true
                         """        androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
-        }"""
+        }""",
                     )
                 }
                 sourcesets.add("    }")
@@ -2032,7 +2051,7 @@ android.useAndroidX=true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-}"""
+}""",
                     )
                 }
                 if (targets.contains("jvm")) {
@@ -2047,13 +2066,14 @@ android.useAndroidX=true
             packageVersion = "1.0.0"
         }
     }
-}"""
+}""",
                     )
                 }
                 val configurationBlocksBlock =
                     if (configurations.isNotEmpty()) configurations.joinToString("\n\n") else ""
 
-                val composeDesktop = if (targets.contains("jvm")) """compose.desktop {
+                val composeDesktop = if (targets.contains("jvm")) {
+                    """compose.desktop {
     application {
         mainClass = "{{namespace}}.MainDesktopKt"
 
@@ -2063,14 +2083,22 @@ android.useAndroidX=true
             packageVersion = "1.0.0"
         }
     }
-}""" else ""
+}"""
+                } else {
+                    ""
+                }
 
-                val androidMainDependencies = if (targets.contains("android")) """        androidMain.dependencies {
+                val androidMainDependencies = if (targets.contains("android")) {
+                    """        androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
-        }""" else ""
+        }"""
+                } else {
+                    ""
+                }
 
-                val androidBlock = if (targets.contains("android")) """android {
+                val androidBlock = if (targets.contains("android")) {
+                    """android {
     namespace = "{{namespace}}"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
@@ -2097,7 +2125,10 @@ android.useAndroidX=true
     }
 }
 
-""" else ""
+"""
+                } else {
+                    ""
+                }
 
                 updatedContent = updatedContent.replace("{{android_versions}}", androidVersions)
                 updatedContent = updatedContent.replace("{{android_libraries}}", androidLibraries)
@@ -2146,12 +2177,11 @@ android.useAndroidX=true
             warnln { "Warning: Failed to link iOS project for IDE: ${e.message}" }
         }
     }
-
 }
 
 fun updateRootBuildFile(
     targetDir: String,
-    targets: Set<String>
+    targets: Set<String>,
 ) {
     val buildFile = File(targetDir, "build.gradle.kts")
     if (!buildFile.exists()) {
@@ -2235,7 +2265,7 @@ fun updateRootBuildFile(
 
 fun updateVersionCatalog(
     targetDir: String,
-    targets: Set<String>
+    targets: Set<String>,
 ) {
     val versionsFile = File(targetDir, "gradle/libs.versions.toml")
     if (!versionsFile.exists()) {
@@ -2381,7 +2411,7 @@ private fun updateSection(content: String, sectionName: String, newEntries: List
 
 fun addModuleToSettings(
     targetDir: String,
-    moduleName: String
+    moduleName: String,
 ) {
     val settingsFile = File(targetDir, "settings.gradle.kts")
     if (!settingsFile.exists()) {
@@ -2412,7 +2442,7 @@ fun createModuleOnly(
     moduleName: String,
     packageName: String,
     appName: String,
-    targets: Set<String>
+    targets: Set<String>,
 ) {
     val moduleDir = File(targetDir, moduleName)
 
@@ -2554,7 +2584,7 @@ fun createModuleOnly(
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
-    }"""
+    }""",
                     )
                 }
                 if (targets.contains("ios")) {
@@ -2568,7 +2598,7 @@ fun createModuleOnly(
             baseName = "$baseName"
             isStatic = true
         }
-    }"""
+    }""",
                     )
                 }
                 if (targets.contains("jvm")) {
@@ -2591,7 +2621,7 @@ fun createModuleOnly(
             }
         }
         binaries.executable()
-    }"""
+    }""",
                     )
                     kotlinTargets.add(
                         """    @OptIn(ExperimentalWasmDsl::class)
@@ -2611,7 +2641,7 @@ fun createModuleOnly(
             }
         }
         binaries.executable()
-    }"""
+    }""",
                     )
                 }
                 val kotlinTargetsBlock =
@@ -2624,14 +2654,14 @@ fun createModuleOnly(
         commonMain.dependencies {
             implementation(compose.components.uiToolingPreview)
             implementation(libs.composables.ui)
-        }"""
+        }""",
                 )
 
                 if (targets.contains("jvm")) {
                     sourcesets.add(
                         """        jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
-        }"""
+        }""",
                     )
                 }
                 if (targets.contains("android")) {
@@ -2639,7 +2669,7 @@ fun createModuleOnly(
                         """        androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
-        }"""
+        }""",
                     )
                 }
                 sourcesets.add("    }")
@@ -2674,7 +2704,7 @@ fun createModuleOnly(
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-}"""
+}""",
                     )
                 }
                 if (targets.contains("jvm")) {
@@ -2689,7 +2719,7 @@ fun createModuleOnly(
             packageVersion = "1.0.0"
         }
     }
-}"""
+}""",
                     )
                 }
                 val configurationBlocksBlock =
@@ -2732,7 +2762,7 @@ fun createModuleOnly(
 
 private fun createIosAppDirectory(
     targetDir: String,
-    moduleName: String
+    moduleName: String,
 ) {
     val iosAppName = "ios${toCamelCase(moduleName)}"
     val targetDir = File(targetDir, iosAppName)
@@ -2791,8 +2821,11 @@ private fun createIosAppDirectory(
         copyResource(resourcePath, targetFile)
 
         // Replace placeholders in text files
-        if (targetFile.name.endsWith(".swift") || targetFile.name.endsWith(".h") || targetFile.name.endsWith(".m") ||
-            targetFile.name.endsWith(".pbxproj") || targetFile.name.endsWith(".xcconfig")
+        if (targetFile.name.endsWith(".swift") ||
+            targetFile.name.endsWith(".h") ||
+            targetFile.name.endsWith(".m") ||
+            targetFile.name.endsWith(".pbxproj") ||
+            targetFile.name.endsWith(".xcconfig")
         ) {
             try {
                 val content = targetFile.readText()
@@ -2847,7 +2880,6 @@ private fun getKotlinVersion(projectDir: File): String? {
         if (versionMatch != null) {
             return versionMatch.groupValues[1].trim()
         }
-
     } catch (e: Exception) {
         // Failed to get version, return null
     }

@@ -33,7 +33,7 @@ fun main() {
         packageName = packageName,
         appName = appName,
         targets = targets,
-        moduleName = moduleName
+        moduleName = moduleName,
     )
 
     println("Template rendered at ${targetDir.absolutePath}")

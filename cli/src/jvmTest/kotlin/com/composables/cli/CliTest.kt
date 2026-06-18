@@ -4,13 +4,13 @@ import assertk.assertThat
 import assertk.assertions.contains
 import assertk.assertions.doesNotContain
 import assertk.assertions.exists
-import java.io.File
-import java.nio.file.Files
-import kotlin.test.Test
 import assertk.assertions.isDirectory
 import assertk.assertions.isEqualTo
 import assertk.assertions.isFalse
 import assertk.assertions.isTrue
+import java.io.File
+import java.nio.file.Files
+import kotlin.test.Test
 
 class CliTest {
 
@@ -23,7 +23,7 @@ class CliTest {
                 packageName = "com.composables.demo",
                 moduleName = "desktopApp",
                 appName = "The App",
-                targets = setOf(JVM)
+                targets = setOf(JVM),
             )
 
             val projectDir = File(targetDir, "newApp")
@@ -76,7 +76,7 @@ class CliTest {
                 plugins {
                     alias(libs.plugins.jetbrains.kotlin.multiplatform) apply false
                 }
-                """.trimIndent()
+                """.trimIndent(),
             )
 
             updateRootBuildFile(targetDir.absolutePath, setOf(ANDROID))
@@ -105,7 +105,7 @@ class CliTest {
 
                 [plugins]
                 jetbrains-kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
-                """.trimIndent() + "\n"
+                """.trimIndent() + "\n",
             )
 
             updateVersionCatalog(targetDir.absolutePath, setOf(ANDROID))

@@ -84,8 +84,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Build Shadow JAR
-        run: ./gradlew check jvmShadowJar --no-daemon
+      - name: Lint, Test, and Build Shadow JAR
+        run: ./gradlew spotlessCheck check jvmShadowJar --no-daemon
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

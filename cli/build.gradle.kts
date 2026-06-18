@@ -63,7 +63,6 @@ kotlin {
     }
 }
 
-
 // see: https://stackoverflow.com/questions/63426211/kotlin-multiplatform-shadowjar-gradle-plugin-creates-empty-jar
 
 fun registerShadowJar(targetName: String) {
@@ -106,7 +105,7 @@ tasks.register<JavaExec>("renderTemplate") {
     mainClass.set("com.composables.cli.DevTemplateKt")
     classpath(
         tasks.named("jvmJar"),
-        configurations.getByName("jvmRuntimeClasspath")
+        configurations.getByName("jvmRuntimeClasspath"),
     )
 
     systemProperty("composables.template.outputRoot", devTemplateOutputDir.get().asFile.absolutePath)
