@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+# [0.4.6] - 2026-06-18
+
+### Added
+- The default component library in created apps is now [Composables UI](https://composables.com/ui).
+- WASM and JS apps are now preloaded for faster browser loading speed.
+- Testing infrastructure.
+
+### Changed
+
 # [0.4.5] - 2025-12-10
 
 ### Fixed
