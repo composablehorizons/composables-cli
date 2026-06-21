@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-21
+
+### Added
+- The CLI is now distributed via [NPM](https://www.npmjs.com/package/composables-cli) and you can install it on Mac, Windows and Linux using `npm install -g composables-cli`.
+- Added support for Windows and Linux.
+
+### Removed
+- Removed the `update` command. We are no longer handling CLI updates and instead that is done via NPM.
+
+### Fixed
+- `init` now correctly works with absolute output paths.
+- Generated projects now specify the correct root project name in `settings.gradle.kts`.
+
 ## [0.4.6] - 2026-06-18
 
 ### Added
