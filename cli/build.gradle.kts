@@ -2,6 +2,7 @@
 
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import org.gradle.api.tasks.JavaExec
+import org.gradle.api.tasks.testing.Test
 
 plugins {
     application
@@ -48,7 +49,18 @@ sourceSets {
         java.setSrcDirs(listOf("src/jvmTest/kotlin"))
         resources.setSrcDirs(emptyList<String>())
     }
+    create("integrationTest") {
+        java.setSrcDirs(listOf("src/integrationTest/kotlin"))
+        resources.setSrcDirs(emptyList<String>())
+        compileClasspath += sourceSets.main.get().output + configurations.testRuntimeClasspath.get()
+        runtimeClasspath += output + compileClasspath
+    }
 }
+
+val integrationTestSourceSet = sourceSets.named("integrationTest").get()
+
+configurations[integrationTestSourceSet.implementationConfigurationName].extendsFrom(configurations.testImplementation.get())
+configurations[integrationTestSourceSet.runtimeOnlyConfigurationName].extendsFrom(configurations.testRuntimeOnly.get())
 
 dependencies {
     implementation("com.alexstyl:debugln:1.0.3")
@@ -59,6 +71,17 @@ dependencies {
 }
 
 tasks.test {
+    useJUnitPlatform()
+}
+
+val integrationTest = tasks.register<Test>("integrationTest") {
+    description = "Runs end-to-end integration tests for the CLI."
+    group = "verification"
+
+    testClassesDirs = integrationTestSourceSet.output.classesDirs
+    classpath = integrationTestSourceSet.runtimeClasspath
+    shouldRunAfter(tasks.test)
+    dependsOn(tasks.named("installDist"))
     useJUnitPlatform()
 }
 
