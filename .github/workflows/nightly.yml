@@ -37,6 +37,7 @@ jobs:
         with:
           java-version: '17'
           distribution: 'jetbrains'
+          token: ${{ github.token }}
 
       - name: Cache Gradle packages
         uses: actions/cache@v4
