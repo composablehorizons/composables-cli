@@ -130,8 +130,8 @@ class Init : CliktCommand("init") {
 
     override fun run() {
         val workingDir = System.getProperty("user.dir")
-        val projectName = directory.orEmpty()
-        if (projectName.isBlank()) {
+        val projectPath = directory.orEmpty()
+        if (projectPath.isBlank()) {
             debugln { "Please specify the project directory:" }
             infoln { "composables init <project-directory>" }
             debugln { "" }
@@ -139,7 +139,8 @@ class Init : CliktCommand("init") {
             infoln { "composables init app" }
             return
         }
-        val target = if (projectName == ".") File(workingDir) else File(workingDir).resolve(projectName)
+        val target = resolveTargetDirectory(workingDir = workingDir, projectPath = projectPath)
+        val projectName = target.name
 
         // Check if we can create the directory first
         if (target.exists()) {
@@ -197,7 +198,7 @@ class Init : CliktCommand("init") {
                     }
                     return
                 } else {
-                    val dirName = if (projectName == ".") "The current directory" else "The directory $projectName"
+                    val dirName = if (projectPath == ".") "The current directory" else "The directory $projectPath"
                     echo("$dirName is not empty and does not contain a Gradle project.")
                     echo("Try a new directory path or delete the existing one before trying to initialize a new module.")
                     return
@@ -216,8 +217,7 @@ class Init : CliktCommand("init") {
         }
 
         cloneGradleProjectAndPrint(
-            targetDir = workingDir,
-            dirName = projectName,
+            target = target,
             packageName = namespace,
             appName = appName,
             targets = targets,
@@ -388,6 +388,19 @@ class Init : CliktCommand("init") {
                 part[0].isLetter() &&
                 part.all { char -> char.isLetterOrDigit() || char == '_' }
         }
+    }
+}
+
+internal fun resolveTargetDirectory(workingDir: String, projectPath: String): File {
+    if (projectPath == ".") {
+        return File(workingDir)
+    }
+
+    val requestedPath = File(projectPath)
+    return if (requestedPath.isAbsolute) {
+        requestedPath
+    } else {
+        File(workingDir).resolve(projectPath)
     }
 }
 
@@ -1677,20 +1690,18 @@ val gradleScript: String
     }
 
 fun cloneGradleProjectAndPrint(
-    targetDir: String,
-    dirName: String,
+    target: File,
     packageName: String,
     appName: String,
     targets: Set<String>,
     moduleName: String,
 ) {
-    cloneGradleProject(
-        targetDir,
-        dirName,
-        packageName,
-        appName,
-        targets,
-        moduleName,
+    cloneGradleProjectAt(
+        target = target,
+        packageName = packageName,
+        appName = appName,
+        targets = targets,
+        moduleName = moduleName,
     )
     // Log project configuration summary
     infoln { "" }
@@ -1701,10 +1712,10 @@ fun cloneGradleProjectAndPrint(
     infoln { "\tTargets: ${targets.joinToString(", ")}" }
     infoln { "" }
 
-    debugln { "Success! Your new Compose app is ready at ${File(targetDir).resolve(dirName).absolutePath}" }
+    debugln { "Success! Your new Compose app is ready at ${target.absolutePath}" }
     debugln { "Start by typing:" }
     infoln { "" }
-    infoln { "\tcd $dirName" }
+    infoln { "\tcd ${target.absolutePath}" }
     infoln { "\t$gradleScript run" }
     infoln { "" }
     debugln { "Happy coding!" }
@@ -1719,6 +1730,22 @@ fun cloneGradleProject(
     moduleName: String,
 ) {
     val target = File(targetDir).resolve(dirName)
+    cloneGradleProjectAt(
+        target = target,
+        packageName = packageName,
+        appName = appName,
+        targets = targets,
+        moduleName = moduleName,
+    )
+}
+
+private fun cloneGradleProjectAt(
+    target: File,
+    packageName: String,
+    appName: String,
+    targets: Set<String>,
+    moduleName: String,
+) {
 
     fun copyResource(resourcePath: String, targetFile: File) {
         val inputStream: InputStream? = object {}.javaClass.getResourceAsStream(resourcePath)
@@ -2145,6 +2172,7 @@ android.useAndroidX=true
 
                 // Replace remaining placeholders after blocks are built
                 updatedContent = updatedContent.replace("{{namespace}}", packageName)
+                updatedContent = updatedContent.replace("{{project_name}}", target.name)
                 updatedContent = updatedContent.replace("{{module_name}}", moduleName)
                 updatedContent = updatedContent.replace("{{app_name}}", appName)
                 updatedContent = updatedContent.replace("{{ios_binary_name}}", toCamelCase(moduleName))

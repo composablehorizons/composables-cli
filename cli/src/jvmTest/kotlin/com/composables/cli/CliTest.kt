@@ -29,10 +29,12 @@ class CliTest {
             val projectDir = File(targetDir, "newApp")
             val buildFile = File(projectDir, "desktopApp/build.gradle.kts")
             val rootBuildFile = File(projectDir, "build.gradle.kts")
+            val settingsFile = File(projectDir, "settings.gradle.kts")
             val appFile = File(projectDir, "desktopApp/src/commonMain/kotlin/com/composables/demo/App.kt")
 
             assertThat(projectDir.isDirectory, "Generated project directory should exist").isTrue()
             assertThat(buildFile.exists(), "Generated module build file should exist").isTrue()
+            assertThat(settingsFile.exists(), "Generated settings file should exist").isTrue()
             assertThat(appFile.exists(), "App source should be moved to the requested package").isTrue()
 
             assertThat(File(projectDir, "iosDesktopApp").exists(), "iOS app scaffold should be skipped for JVM-only template runs").isFalse()
@@ -41,6 +43,7 @@ class CliTest {
 
             val buildContent = buildFile.readText()
             val rootBuildContent = rootBuildFile.readText()
+            val settingsContent = settingsFile.readText()
             val appContent = appFile.readText()
 
             assertThat(buildContent).contains("jvm()")
@@ -58,6 +61,8 @@ class CliTest {
             assertThat(rootBuildContent).contains("compose-web-compatibility-preloads")
             assertThat(rootBuildContent).contains("js-preloads")
             assertThat(rootBuildContent).contains("wasm-preloads")
+            assertThat(settingsContent).contains("""rootProject.name = "newApp"""")
+            assertThat(settingsContent).contains("""include(":desktopApp")""")
 
             assertThat(appContent).contains("package com.composables.demo")
             assertThat(appContent).contains("Hello Beautiful World!")
@@ -66,6 +71,17 @@ class CliTest {
             assertThat(appContent).doesNotContain("{{app_name}}")
             assertThat(appContent).doesNotContain("{{namespace}}")
         }
+    }
+
+    @Test
+    fun `init derives project name from absolute directory path`() {
+        val targetDir = resolveTargetDirectory(
+            workingDir = "/Users/alexstyl/projects/composables-cli",
+            projectPath = "/Users/alexstyl/projects/timebox",
+        )
+
+        assertThat(targetDir.absolutePath).isEqualTo("/Users/alexstyl/projects/timebox")
+        assertThat(targetDir.name).isEqualTo("timebox")
     }
 
     @Test
