@@ -136,6 +136,7 @@ val assembleNpmPackage = tasks.register<Sync>("assembleNpmPackage") {
             expand("version" to project.version.toString())
         }
     }
+    from(rootProject.file("README.md"))
     from(tasks.named<ShadowJar>("shadowJar")) {
         rename { "composables.jar" }
     }
