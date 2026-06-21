@@ -21,7 +21,7 @@ val WEB = "web"
 
 suspend fun main(args: Array<String>) {
     ComposablesCli()
-        .subcommands(Init(), Update(), Target())
+        .subcommands(Init(), Target())
         .main(args)
 }
 
@@ -41,84 +41,6 @@ class ComposablesCli : CliktCommand(name = "composables") {
         If you have any problems or need help, do not hesitate to ask for help at:
             https://github.com/composablehorizons/composables-cli
     """.trimIndent()
-}
-
-class Update : CliktCommand("update") {
-
-    override fun help(context: Context): String = """
-        Updates the CLI tool with the latest version
-    """.trimIndent()
-
-    override fun run() {
-        try {
-            echo("Updating Composables CLI...")
-
-            // Get current JAR path
-            val currentJarPath = this::class.java.protectionDomain.codeSource.location.path
-            val installDir = File(currentJarPath).parent
-
-            // Download to temporary location first
-            val tempJar = File(installDir, "composables.jar.tmp")
-
-            echo("Fetching latest version...")
-            val latestVersion = ProcessBuilder(
-                "bash",
-                "-c",
-                "curl -s https://api.github.com/repos/composablehorizons/composables-cli/releases/latest | grep '\"tag_name\":' | sed -E 's/.*\"([^\"]+)\".*/\\1/'",
-            )
-                .redirectErrorStream(true)
-                .start()
-                .inputStream.bufferedReader()
-                .readText()
-                .trim()
-
-            if (latestVersion.isEmpty()) {
-                echo("Failed to fetch latest version", err = true)
-                return
-            }
-
-            echo("Latest version: $latestVersion")
-            echo("Downloading...")
-
-            val downloadProcess = ProcessBuilder(
-                "curl",
-                "-fSL",
-                "https://github.com/composablehorizons/composables-cli/releases/download/$latestVersion/composables.jar",
-                "-o",
-                tempJar.absolutePath,
-            ).inheritIO().start()
-
-            val downloadExitCode = downloadProcess.waitFor()
-            if (downloadExitCode != 0) {
-                echo("Failed to download new version", err = true)
-                tempJar.delete()
-                return
-            }
-
-            echo("✓ Downloaded new version")
-
-            // Replace the JAR file
-            val currentJar = File(currentJarPath)
-            if (currentJar.exists()) {
-                if (!currentJar.delete()) {
-                    echo("Failed to remove old JAR file", err = true)
-                    tempJar.delete()
-                    return
-                }
-            }
-
-            if (!tempJar.renameTo(currentJar)) {
-                echo("Failed to install new JAR file", err = true)
-                tempJar.delete()
-                return
-            }
-
-            echo("✓ Update completed successfully!")
-            echo("Note: Restart your terminal to use the new version")
-        } catch (e: Exception) {
-            echo("Failed to run update: ${e.message}", err = true)
-        }
-    }
 }
 
 class Init : CliktCommand("init") {
