@@ -9,4 +9,5 @@
 /dataSources/
 /dataSources.local.xml
 /artifacts/
+/kotlinc.xml
 modules.xml
