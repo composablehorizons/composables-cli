@@ -134,6 +134,27 @@ class CliIntegrationTest {
     }
 
     @Test
+    fun `cli create-app with no args fails cleanly without stdin`() {
+        val rootDir = Files.createTempDirectory("composables-cli-create-app-no-stdin").toFile()
+        try {
+            val launcher = installedLauncher()
+
+            val createResult = runProcess(
+                command = listOf(launcher.absolutePath, "create-app"),
+                workingDir = rootDir,
+                timeoutSeconds = 60,
+            )
+
+            assertThat(createResult.finished).isTrue()
+            assertThat(createResult.exitCode).isEqualTo(1)
+            assertThat(createResult.output).contains("Interactive mode requires stdin")
+            assertThat(createResult.output).doesNotContain("ReadAfterEOFException")
+        } finally {
+            rootDir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `cli create-app requires overwrite for non-empty directories`() {
         val rootDir = Files.createTempDirectory("composables-cli-create-app-existing").toFile()
         try {

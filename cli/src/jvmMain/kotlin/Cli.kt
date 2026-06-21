@@ -69,10 +69,19 @@ class CreateApp : CliktCommand("create-app") {
         val targets: Set<String>
 
         if (!anyExplicitInput) {
-            target = readNewAppDirectory(workingDir)
-            resolvedPackageName = readNamespace()
-            resolvedAppName = readAppName()
-            targets = readTargets()
+            try {
+                target = readNewAppDirectory(workingDir)
+                resolvedPackageName = readNamespace()
+                resolvedAppName = readAppName()
+                targets = readTargets()
+            } catch (error: RuntimeException) {
+                if (error::class.simpleName == "ReadAfterEOFException" || error.message?.contains("EOF has already been reached") == true) {
+                    throw UsageError(
+                        "Interactive mode requires stdin. Pass <directory>, --package, --app-name, and --targets for non-interactive use.",
+                    )
+                }
+                throw error
+            }
         } else {
             val missingInputs = buildList {
                 if (directory == null) add("<directory>")
