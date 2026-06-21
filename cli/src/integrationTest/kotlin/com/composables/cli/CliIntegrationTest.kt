@@ -15,13 +15,13 @@ class CliIntegrationTest {
     fun `cli init creates a jvm project that compiles`() {
         val rootDir = Files.createTempDirectory("composables-cli-integration").toFile()
         try {
-            val projectDir = File(rootDir, "timebox")
+            val projectDir = File(rootDir, "sample-app")
             val launcher = installedLauncher()
 
             val initResult = runProcess(
                 command = listOf(launcher.absolutePath, "init", projectDir.absolutePath),
                 workingDir = rootDir,
-                stdin = "\nTimebox\ncom.example.timebox\nn\ny\nn\nn\n",
+                stdin = "\nSample App\ncom.example.sampleapp\nn\ny\nn\nn\n",
                 timeoutSeconds = 60,
             )
 
