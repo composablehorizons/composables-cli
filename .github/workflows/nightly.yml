@@ -1,9 +1,6 @@
 name: Nightly
 
 on:
-  pull_request:
-    paths:
-      - '.github/workflows/nightly.yml'
   push:
     paths:
       - '.github/workflows/nightly.yml'
@@ -35,7 +32,7 @@ jobs:
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: '17.0.14+1367.22'
+          java-version: '17'
           distribution: 'jetbrains'
           token: ${{ github.token }}
 
