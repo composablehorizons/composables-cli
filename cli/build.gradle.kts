@@ -3,6 +3,7 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.testing.Test
+import java.nio.charset.StandardCharsets
 
 plugins {
     application
@@ -55,12 +56,21 @@ sourceSets {
         compileClasspath += sourceSets.main.get().output + configurations.testRuntimeClasspath.get()
         runtimeClasspath += output + compileClasspath
     }
+    create("npmTest") {
+        java.setSrcDirs(listOf("src/npmTest/kotlin"))
+        resources.setSrcDirs(emptyList<String>())
+        compileClasspath += sourceSets.main.get().output + configurations.testRuntimeClasspath.get()
+        runtimeClasspath += output + compileClasspath
+    }
 }
 
 val integrationTestSourceSet = sourceSets.named("integrationTest").get()
+val npmTestSourceSet = sourceSets.named("npmTest").get()
 
 configurations[integrationTestSourceSet.implementationConfigurationName].extendsFrom(configurations.testImplementation.get())
 configurations[integrationTestSourceSet.runtimeOnlyConfigurationName].extendsFrom(configurations.testRuntimeOnly.get())
+configurations[npmTestSourceSet.implementationConfigurationName].extendsFrom(configurations.testImplementation.get())
+configurations[npmTestSourceSet.runtimeOnlyConfigurationName].extendsFrom(configurations.testRuntimeOnly.get())
 
 dependencies {
     implementation("com.alexstyl:debugln:1.0.3")
@@ -86,6 +96,17 @@ val integrationTest = tasks.register<Test>("integrationTest") {
     useJUnitPlatform()
 }
 
+val npmPackageCheck = tasks.register<Test>("npmPackageCheck") {
+    description = "Verifies the published npm package installs and launches correctly."
+    group = "verification"
+
+    testClassesDirs = npmTestSourceSet.output.classesDirs
+    classpath = npmTestSourceSet.runtimeClasspath
+    shouldRunAfter(tasks.named("integrationTest"))
+    dependsOn(tasks.named("npmPack"))
+    useJUnitPlatform()
+}
+
 tasks.named<ShadowJar>("shadowJar") {
     group = "build"
     from(sourceSets.main.get().output)
@@ -97,6 +118,41 @@ tasks.named<ShadowJar>("shadowJar") {
         attributes("Main-Class" to mainClassName)
     }
     mergeServiceFiles()
+}
+
+val npmPackageDir = layout.buildDirectory.dir("npm/package")
+val npmTarballDir = layout.buildDirectory.dir("npm/tarball")
+
+val assembleNpmPackage = tasks.register<Sync>("assembleNpmPackage") {
+    description = "Assembles the npm package for Composables CLI."
+    group = "distribution"
+
+    dependsOn(tasks.named("shadowJar"))
+
+    from("src/npm") {
+        includeEmptyDirs = false
+        filteringCharset = StandardCharsets.UTF_8.name()
+        filesMatching("package.json") {
+            expand("version" to project.version.toString())
+        }
+    }
+    from(tasks.named<ShadowJar>("shadowJar")) {
+        rename { "composables.jar" }
+    }
+    into(npmPackageDir)
+}
+
+val npmPack = tasks.register<Exec>("npmPack") {
+    description = "Creates a tarball for the npm package."
+    group = "distribution"
+
+    dependsOn(assembleNpmPackage)
+
+    inputs.dir(npmPackageDir)
+    outputs.dir(npmTarballDir)
+
+    workingDir(npmPackageDir)
+    commandLine(npmCommand(), "pack", "--pack-destination", npmTarballDir.get().asFile.absolutePath)
 }
 
 tasks.jar {
@@ -129,3 +185,5 @@ tasks.register<Exec>("runTemplate") {
     workingDir(renderedProjectDir)
     commandLine("./gradlew", "run")
 }
+
+fun npmCommand(): String = if (System.getProperty("os.name").startsWith("Windows")) "npm.cmd" else "npm"

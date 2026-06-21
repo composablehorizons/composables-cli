@@ -74,6 +74,13 @@ jobs:
           java-version: '17'
           distribution: 'jetbrains'
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+          scope: '@composablehorizons'
+
       - name: Cache Gradle packages
         uses: actions/cache@v4
         with:
@@ -84,8 +91,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Lint, Test, and Build Shadow JAR
-        run: ./gradlew spotlessCheck test shadowJar --no-daemon
+      - name: Run product checks
+        run: ./gradlew spotlessCheck test integrationTest --no-daemon
+
+      - name: Check npm package
+        run: ./gradlew npmPackageCheck --no-daemon
+
+      - name: Publish npm package
+        run: npm publish cli/build/npm/package --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
