@@ -17,7 +17,17 @@ permissions:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            gradle_command: ./gradlew
+          - os: macos-latest
+            gradle_command: ./gradlew
+          - os: windows-latest
+            gradle_command: .\gradlew.bat
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +49,7 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Run formatting, unit tests, and integration tests
-        run: ./gradlew spotlessCheck test integrationTest --no-daemon
+        run: ${{ matrix.gradle_command }} spotlessCheck test integrationTest --no-daemon
 
       - name: Report scheduled failure
         if: failure() && github.event_name == 'schedule'
