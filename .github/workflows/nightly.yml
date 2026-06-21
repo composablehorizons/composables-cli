@@ -16,7 +16,7 @@ permissions:
   issues: write
 
 jobs:
-  verify:
+  verify-generated-project:
     strategy:
       fail-fast: false
       matrix:

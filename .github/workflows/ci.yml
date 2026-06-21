@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  verify:
+  verify-generated-project:
     strategy:
       fail-fast: false
       matrix:
