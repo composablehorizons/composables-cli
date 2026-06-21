@@ -6,7 +6,15 @@ on:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            gradle_command: ./gradlew
+          - os: windows-latest
+            gradle_command: .\gradlew.bat
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
@@ -28,4 +36,4 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Run formatting and tests
-        run: ./gradlew spotlessCheck test --no-daemon
+        run: ${{ matrix.gradle_command }} spotlessCheck test integrationTest --no-daemon

@@ -139,12 +139,36 @@ class CliTest {
         }
     }
 
+    @Test
+    fun `gradleScript uses batch file on windows`() {
+        withOsName("Windows 11") {
+            assertThat(gradleScript).isEqualTo("gradlew.bat")
+        }
+    }
+
+    @Test
+    fun `gradleScript uses shell script on unix`() {
+        withOsName("Linux") {
+            assertThat(gradleScript).isEqualTo("./gradlew")
+        }
+    }
+
     private fun withTempDir(block: (File) -> Unit) {
         val dir = Files.createTempDirectory("composables-cli-test").toFile()
         try {
             block(dir)
         } finally {
             dir.deleteRecursively()
+        }
+    }
+
+    private fun withOsName(value: String, block: () -> Unit) {
+        val original = System.getProperty("os.name")
+        try {
+            System.setProperty("os.name", value)
+            block()
+        } finally {
+            System.setProperty("os.name", original)
         }
     }
 

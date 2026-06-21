@@ -2817,7 +2817,7 @@ private fun getKotlinVersion(projectDir: File): String? {
         }
 
         // Try to run gradle and get the version
-        val process = ProcessBuilder("./gradlew", "properties", "-q", "--no-daemon")
+        val process = ProcessBuilder(gradleScript, "properties", "-q", "--no-daemon")
             .directory(projectDir)
             .redirectErrorStream(true)
             .start()
