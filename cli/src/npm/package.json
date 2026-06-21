@@ -1,0 +1,33 @@
+{
+  "name": "composables-cli",
+  "version": "${version}",
+  "description": "Composables CLI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/composablehorizons/composables-cli.git"
+  },
+  "homepage": "https://github.com/composablehorizons/composables-cli",
+  "bugs": {
+    "url": "https://github.com/composablehorizons/composables-cli/issues"
+  },
+  "bin": {
+    "composables": "./bin/composables.js"
+  },
+  "files": [
+    "bin",
+    "composables.jar"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "compose",
+    "jetbrains-compose",
+    "kotlin",
+    "cli"
+  ]
+}
