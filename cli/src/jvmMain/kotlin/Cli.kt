@@ -12,7 +12,6 @@ import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
-import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.options.versionOption
 import java.io.File
 import java.io.InputStream
@@ -54,45 +53,58 @@ class CreateApp : CliktCommand("create-app") {
         Creates a new Compose Multiplatform app in the specified <directory> path.
     """.trimIndent()
 
-    private val directory by argument("directory", help = "The directory path to create the new app in")
-    private val packageName by option("--package", help = "The package name for the generated app").required()
-    private val appName by option("--app-name", help = "The display name for the generated app").required()
-    private val targetsInput by option("--targets", help = "Comma-separated targets: android,jvm,ios,web").required()
+    private val directory by argument("directory", help = "The directory path to create the new app in").optional()
+    private val packageName by option("--package", help = "The package name for the generated app")
+    private val appName by option("--app-name", help = "The display name for the generated app")
+    private val targetsInput by option("--targets", help = "Comma-separated targets: android,jvm,ios,web")
     private val overwrite by option("--overwrite", help = "Overwrite an existing target directory").flag(default = false)
 
     override fun run() {
-        if (!isValidPackageName(packageName)) {
-            throw UsageError("Invalid package name. Must be a valid Java package name (e.g., com.example.app)")
-        }
+        val anyExplicitInput = directory != null || packageName != null || appName != null || targetsInput != null || overwrite
+        val workingDir = System.getProperty("user.dir")
 
-        if (!isValidAppName(appName)) {
-            throw UsageError("Invalid app name. Must contain at least one letter or digit")
-        }
+        val target: File
+        val resolvedPackageName: String
+        val resolvedAppName: String
+        val targets: Set<String>
 
-        val targets = try {
-            parseTargets(targetsInput)
-        } catch (error: IllegalArgumentException) {
-            throw UsageError(error.message ?: "Invalid targets")
-        }
-        val target = resolveTargetDirectory(
-            workingDir = System.getProperty("user.dir"),
-            projectPath = directory,
-        )
-
-        when {
-            target.exists() && overwrite -> {
-                if (!target.deleteRecursively()) {
-                    throw UsageError("Failed to overwrite existing directory at ${target.absolutePath}")
-                }
+        if (!anyExplicitInput) {
+            target = readNewAppDirectory(workingDir)
+            resolvedPackageName = readNamespace()
+            resolvedAppName = readAppName()
+            targets = readTargets()
+        } else {
+            val missingInputs = buildList {
+                if (directory == null) add("<directory>")
+                if (packageName == null) add("--package")
+                if (appName == null) add("--app-name")
+                if (targetsInput == null) add("--targets")
+            }
+            if (missingInputs.isNotEmpty()) {
+                throw UsageError("When using create-app non-interactively, specify all required inputs. Missing: ${missingInputs.joinToString(", ")}")
             }
 
-            target.exists() && target.isFile -> {
-                throw UsageError("Target path ${target.absolutePath} is a file. Choose a different directory or use --overwrite.")
+            resolvedPackageName = packageName!!
+            resolvedAppName = appName!!
+
+            if (!isValidPackageName(resolvedPackageName)) {
+                throw UsageError("Invalid package name. Must be a valid Java package name (e.g., com.example.app)")
             }
 
-            target.exists() && target.listFiles()?.isNotEmpty() == true -> {
-                throw UsageError("Target directory ${target.absolutePath} already exists and is not empty. Use --overwrite to replace it.")
+            if (!isValidAppName(resolvedAppName)) {
+                throw UsageError("Invalid app name. Must contain at least one letter or digit")
             }
+
+            targets = try {
+                parseTargets(targetsInput!!)
+            } catch (error: IllegalArgumentException) {
+                throw UsageError(error.message ?: "Invalid targets")
+            }
+            target = resolveTargetDirectory(
+                workingDir = workingDir,
+                projectPath = directory!!,
+            )
+            validateCreateAppTargetDirectory(target, overwrite)
         }
 
         if (!target.exists() && !target.mkdirs()) {
@@ -101,8 +113,8 @@ class CreateApp : CliktCommand("create-app") {
 
         cloneGradleProjectAndPrint(
             target = target,
-            packageName = packageName,
-            appName = appName,
+            packageName = resolvedPackageName,
+            appName = resolvedAppName,
             targets = targets,
             moduleName = "composeApp",
         )
@@ -213,91 +225,6 @@ class Init : CliktCommand("init") {
         )
     }
 
-    private fun readNamespace(): String {
-        while (true) {
-            echo("Enter package name (default: com.example.app): ", trailingNewline = false)
-            val namespace = readln().trim()
-            if (namespace.isEmpty()) {
-                return "com.example.app"
-            }
-
-            if (!isValidPackageName(namespace)) {
-                echo("Invalid package name. Must be a valid Java package name (e.g., com.example.app)")
-                continue
-            }
-
-            return namespace
-        }
-    }
-
-    private fun readAppName(): String {
-        while (true) {
-            echo("Enter app name (default: My App): ", trailingNewline = false)
-            val appName = readln().trim()
-
-            if (appName.isEmpty()) {
-                return "My App"
-            }
-
-            if (!isValidAppName(appName)) {
-                echo("Invalid app name. Must start with a letter and contain only letters, digits, or underscores")
-                continue
-            }
-
-            return appName
-        }
-    }
-
-    private fun readTargets(): Set<String> {
-        while (true) {
-            val targets = mutableSetOf<String>()
-
-            echo("Which platforms would you like your app to run on?")
-
-            while (true) {
-                echo("Android (y/n, default: y): ", trailingNewline = false)
-                val android = readln().trim().lowercase()
-                if (android.isEmpty() || android == "y" || android == "yes") {
-                    targets.add(ANDROID)
-                }
-                break
-            }
-
-            while (true) {
-                echo("JVM (Desktop) (y/n, default: y): ", trailingNewline = false)
-                val jvm = readln().trim().lowercase()
-                if (jvm.isEmpty() || jvm == "y" || jvm == "yes") {
-                    targets.add(JVM)
-                }
-                break
-            }
-
-            while (true) {
-                echo("iOS (y/n, default: y): ", trailingNewline = false)
-                val ios = readln().trim().lowercase()
-                if (ios.isEmpty() || ios == "y" || ios == "yes") {
-                    targets.add(IOS)
-                }
-                break
-            }
-
-            while (true) {
-                echo("Web (y/n, default: y): ", trailingNewline = false)
-                val web = readln().trim().lowercase()
-                if (web.isEmpty() || web == "y" || web == "yes") {
-                    targets.add(WEB)
-                }
-                break
-            }
-
-            if (targets.isNotEmpty()) {
-                return targets
-            } else {
-                echo("At least one platform is required...")
-            }
-        }
-    }
-
     private fun readModuleName(projectName: String): String {
         while (true) {
             echo("Enter module name (default: composeApp): ", trailingNewline = false)
@@ -360,6 +287,142 @@ internal fun resolveTargetDirectory(workingDir: String, projectPath: String): Fi
         requestedPath
     } else {
         File(workingDir).resolve(projectPath)
+    }
+}
+
+internal fun validateCreateAppTargetDirectory(target: File, overwrite: Boolean) {
+    when {
+        target.exists() && overwrite -> {
+            if (!target.deleteRecursively()) {
+                throw UsageError("Failed to overwrite existing directory at ${target.absolutePath}")
+            }
+        }
+
+        target.exists() && target.isFile -> {
+            throw UsageError("Target path ${target.absolutePath} is a file. Choose a different directory or use --overwrite.")
+        }
+
+        target.exists() && target.listFiles()?.isNotEmpty() == true -> {
+            throw UsageError("Target directory ${target.absolutePath} already exists and is not empty. Use --overwrite to replace it.")
+        }
+
+        target.exists() && target.listFiles()?.isEmpty() == true -> {
+            target.deleteRecursively()
+        }
+    }
+}
+
+internal fun readNewAppDirectory(workingDir: String): File {
+    while (true) {
+        print("Enter project directory: ")
+        val projectPath = readln().trim()
+        if (projectPath.isBlank()) {
+            println("Project directory is required.")
+            continue
+        }
+
+        val target = resolveTargetDirectory(workingDir = workingDir, projectPath = projectPath)
+        when {
+            target.exists() && target.isFile -> {
+                println("Target path ${target.absolutePath} is a file. Choose a different directory.")
+            }
+
+            target.exists() && target.listFiles()?.isNotEmpty() == true -> {
+                println("Target directory ${target.absolutePath} already exists and is not empty. Choose a different directory.")
+            }
+
+            else -> {
+                if (target.exists() && target.listFiles()?.isEmpty() == true) {
+                    target.deleteRecursively()
+                }
+                return target
+            }
+        }
+    }
+}
+
+internal fun readNamespace(): String {
+    while (true) {
+        print("Enter package name (default: com.example.app): ")
+        val namespace = readln().trim()
+        if (namespace.isEmpty()) {
+            return "com.example.app"
+        }
+
+        if (!isValidPackageName(namespace)) {
+            println("Invalid package name. Must be a valid Java package name (e.g., com.example.app)")
+            continue
+        }
+
+        return namespace
+    }
+}
+
+internal fun readAppName(): String {
+    while (true) {
+        print("Enter app name (default: My App): ")
+        val appName = readln().trim()
+
+        if (appName.isEmpty()) {
+            return "My App"
+        }
+
+        if (!isValidAppName(appName)) {
+            println("Invalid app name. Must contain at least one letter or digit")
+            continue
+        }
+
+        return appName
+    }
+}
+
+internal fun readTargets(): Set<String> {
+    while (true) {
+        val targets = mutableSetOf<String>()
+
+        println("Which platforms would you like your app to run on?")
+
+        while (true) {
+            print("Android (y/n, default: y): ")
+            val android = readln().trim().lowercase()
+            if (android.isEmpty() || android == "y" || android == "yes") {
+                targets.add(ANDROID)
+            }
+            break
+        }
+
+        while (true) {
+            print("JVM (Desktop) (y/n, default: y): ")
+            val jvm = readln().trim().lowercase()
+            if (jvm.isEmpty() || jvm == "y" || jvm == "yes") {
+                targets.add(JVM)
+            }
+            break
+        }
+
+        while (true) {
+            print("iOS (y/n, default: y): ")
+            val ios = readln().trim().lowercase()
+            if (ios.isEmpty() || ios == "y" || ios == "yes") {
+                targets.add(IOS)
+            }
+            break
+        }
+
+        while (true) {
+            print("Web (y/n, default: y): ")
+            val web = readln().trim().lowercase()
+            if (web.isEmpty() || web == "y" || web == "yes") {
+                targets.add(WEB)
+            }
+            break
+        }
+
+        if (targets.isNotEmpty()) {
+            return targets
+        } else {
+            println("At least one platform is required...")
+        }
     }
 }
 

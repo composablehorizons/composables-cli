@@ -102,6 +102,38 @@ class CliIntegrationTest {
     }
 
     @Test
+    fun `cli create-app with no args runs interactively and creates a jvm project that compiles`() {
+        val rootDir = Files.createTempDirectory("composables-cli-create-app-interactive").toFile()
+        try {
+            val projectDir = File(rootDir, "sample-app")
+            val launcher = installedLauncher()
+
+            val createResult = runProcess(
+                command = listOf(launcher.absolutePath, "create-app"),
+                workingDir = rootDir,
+                stdin = "sample-app\ncom.example.sampleapp\nSample App\nn\ny\nn\nn\n",
+                timeoutSeconds = 60,
+            )
+
+            assertThat(createResult.finished).isTrue()
+            assertThat(createResult.exitCode).isEqualTo(0)
+            assertThat(createResult.output).contains("Success! Your new Compose app is ready")
+
+            val compileResult = runProcess(
+                command = listOf(projectGradleScript(), ":composeApp:compileKotlinJvm"),
+                workingDir = projectDir,
+                timeoutSeconds = 180,
+            )
+
+            assertThat(compileResult.finished).isTrue()
+            assertThat(compileResult.exitCode).isEqualTo(0)
+            assertThat(compileResult.output).contains("BUILD SUCCESSFUL")
+        } finally {
+            rootDir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `cli create-app requires overwrite for non-empty directories`() {
         val rootDir = Files.createTempDirectory("composables-cli-create-app-existing").toFile()
         try {
@@ -130,6 +162,34 @@ class CliIntegrationTest {
             assertThat(createResult.finished).isTrue()
             assertThat(createResult.exitCode).isEqualTo(1)
             assertThat(createResult.output).contains("already exists and is not empty")
+        } finally {
+            rootDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `cli create-app with partial args fails without prompting`() {
+        val rootDir = Files.createTempDirectory("composables-cli-create-app-partial").toFile()
+        try {
+            val launcher = installedLauncher()
+
+            val createResult = runProcess(
+                command = listOf(
+                    launcher.absolutePath,
+                    "create-app",
+                    "sample-app",
+                    "--package",
+                    "com.example.sampleapp",
+                ),
+                workingDir = rootDir,
+                timeoutSeconds = 60,
+            )
+
+            assertThat(createResult.finished).isTrue()
+            assertThat(createResult.exitCode).isEqualTo(1)
+            assertThat(createResult.output).contains("When using create-app non-interactively")
+            assertThat(createResult.output).contains("--app-name")
+            assertThat(createResult.output).contains("--targets")
         } finally {
             rootDir.deleteRecursively()
         }
