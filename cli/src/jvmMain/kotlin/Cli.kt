@@ -5,10 +5,14 @@ import com.alexstyl.debugln.infoln
 import com.alexstyl.debugln.warnln
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
+import com.github.ajalt.clikt.core.UsageError
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
+import com.github.ajalt.clikt.parameters.options.flag
+import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.options.versionOption
 import java.io.File
 import java.io.InputStream
@@ -23,7 +27,7 @@ private fun File.toResourcePath(): String = invariantSeparatorsPath.replace('\\'
 
 suspend fun main(args: Array<String>) {
     ComposablesCli()
-        .subcommands(Init(), Target())
+        .subcommands(CreateApp(), Init(), Target())
         .main(args)
 }
 
@@ -43,6 +47,66 @@ class ComposablesCli : CliktCommand(name = "composables") {
         If you have any problems or need help, do not hesitate to ask for help at:
             https://github.com/composablehorizons/composables-cli
     """.trimIndent()
+}
+
+class CreateApp : CliktCommand("create-app") {
+    override fun help(context: Context): String = """
+        Creates a new Compose Multiplatform app in the specified <directory> path.
+    """.trimIndent()
+
+    private val directory by argument("directory", help = "The directory path to create the new app in")
+    private val packageName by option("--package", help = "The package name for the generated app").required()
+    private val appName by option("--app-name", help = "The display name for the generated app").required()
+    private val targetsInput by option("--targets", help = "Comma-separated targets: android,jvm,ios,web").required()
+    private val overwrite by option("--overwrite", help = "Overwrite an existing target directory").flag(default = false)
+
+    override fun run() {
+        if (!isValidPackageName(packageName)) {
+            throw UsageError("Invalid package name. Must be a valid Java package name (e.g., com.example.app)")
+        }
+
+        if (!isValidAppName(appName)) {
+            throw UsageError("Invalid app name. Must contain at least one letter or digit")
+        }
+
+        val targets = try {
+            parseTargets(targetsInput)
+        } catch (error: IllegalArgumentException) {
+            throw UsageError(error.message ?: "Invalid targets")
+        }
+        val target = resolveTargetDirectory(
+            workingDir = System.getProperty("user.dir"),
+            projectPath = directory,
+        )
+
+        when {
+            target.exists() && overwrite -> {
+                if (!target.deleteRecursively()) {
+                    throw UsageError("Failed to overwrite existing directory at ${target.absolutePath}")
+                }
+            }
+
+            target.exists() && target.isFile -> {
+                throw UsageError("Target path ${target.absolutePath} is a file. Choose a different directory or use --overwrite.")
+            }
+
+            target.exists() && target.listFiles()?.isNotEmpty() == true -> {
+                throw UsageError("Target directory ${target.absolutePath} already exists and is not empty. Use --overwrite to replace it.")
+            }
+        }
+
+        if (!target.exists() && !target.mkdirs()) {
+            throw UsageError("Failed to create directory at ${target.absolutePath}")
+        }
+
+        cloneGradleProjectAndPrint(
+            target = target,
+            packageName = packageName,
+            appName = appName,
+            targets = targets,
+            moduleName = "composeApp",
+        )
+    }
 }
 
 class Init : CliktCommand("init") {
@@ -234,13 +298,6 @@ class Init : CliktCommand("init") {
         }
     }
 
-    private fun isValidAppName(appName: String): Boolean {
-        if (appName.isEmpty()) return false
-
-        // Check if it contains at least one letter or digit
-        return appName.any { char -> char.isLetterOrDigit() }
-    }
-
     private fun readModuleName(projectName: String): String {
         while (true) {
             echo("Enter module name (default: composeApp): ", trailingNewline = false)
@@ -291,28 +348,6 @@ class Init : CliktCommand("init") {
             return moduleName
         }
     }
-
-    private fun isValidModuleName(moduleName: String): Boolean {
-        if (moduleName.isEmpty()) return false
-
-        // Check if it contains at least one letter or digit
-        return moduleName.any { char -> char.isLetterOrDigit() } &&
-            moduleName.all { char -> char.isLetterOrDigit() || char == '-' || char == '_' }
-    }
-
-    private fun isValidPackageName(packageName: String): Boolean {
-        if (packageName.isEmpty()) return false
-
-        val parts = packageName.split(".")
-        if (parts.size < 2) return false
-
-        // Check each part is a valid Java identifier
-        return parts.all { part ->
-            part.isNotEmpty() &&
-                part[0].isLetter() &&
-                part.all { char -> char.isLetterOrDigit() || char == '_' }
-        }
-    }
 }
 
 internal fun resolveTargetDirectory(workingDir: String, projectPath: String): File {
@@ -325,6 +360,53 @@ internal fun resolveTargetDirectory(workingDir: String, projectPath: String): Fi
         requestedPath
     } else {
         File(workingDir).resolve(projectPath)
+    }
+}
+
+internal fun isValidAppName(appName: String): Boolean {
+    if (appName.isEmpty()) return false
+    return appName.any { char -> char.isLetterOrDigit() }
+}
+
+internal fun isValidModuleName(moduleName: String): Boolean {
+    if (moduleName.isEmpty()) return false
+    return moduleName.any { char -> char.isLetterOrDigit() } &&
+        moduleName.all { char -> char.isLetterOrDigit() || char == '-' || char == '_' }
+}
+
+internal fun isValidPackageName(packageName: String): Boolean {
+    if (packageName.isEmpty()) return false
+
+    val parts = packageName.split(".")
+    if (parts.size < 2) return false
+
+    return parts.all { part ->
+        part.isNotEmpty() &&
+            part[0].isLetter() &&
+            part.all { char -> char.isLetterOrDigit() || char == '_' }
+    }
+}
+
+internal fun parseTargets(targetsInput: String): Set<String> {
+    val validTargets = setOf(ANDROID, JVM, IOS, WEB)
+    val targets = targetsInput
+        .split(",")
+        .map { it.trim().lowercase() }
+        .filter { it.isNotEmpty() }
+
+    if (targets.isEmpty()) {
+        throw IllegalArgumentException("At least one target is required. Use --targets android,jvm,ios,web")
+    }
+
+    val invalidTargets = targets.filterNot { it in validTargets }
+    if (invalidTargets.isNotEmpty()) {
+        throw IllegalArgumentException(
+            "Unknown targets: ${invalidTargets.joinToString(", ")}. Available targets: android, jvm, ios, web",
+        )
+    }
+
+    return linkedSetOf<String>().apply {
+        addAll(targets)
     }
 }
 
@@ -360,7 +442,7 @@ class Target : CliktCommand("target") {
         if (!isValidComposeAppDirectory(workingDir)) {
             echo("This doesn't appear to be a Compose Multiplatform project.")
             echo("To create a new Compose app, run:")
-            echo("    composables init app")
+            echo("    composables create-app app --package com.example.app --app-name \"My App\" --targets android,jvm,ios,web")
             return
         }
 

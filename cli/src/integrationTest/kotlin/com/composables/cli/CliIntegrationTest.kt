@@ -60,6 +60,81 @@ class CliIntegrationTest {
         }
     }
 
+    @Test
+    fun `cli create-app creates a jvm project that compiles`() {
+        val rootDir = Files.createTempDirectory("composables-cli-create-app").toFile()
+        try {
+            val projectDir = File(rootDir, "sample-app")
+            val launcher = installedLauncher()
+
+            val createResult = runProcess(
+                command = listOf(
+                    launcher.absolutePath,
+                    "create-app",
+                    projectDir.absolutePath,
+                    "--package",
+                    "com.example.sampleapp",
+                    "--app-name",
+                    "Sample App",
+                    "--targets",
+                    "jvm",
+                ),
+                workingDir = rootDir,
+                timeoutSeconds = 60,
+            )
+
+            assertThat(createResult.finished).isTrue()
+            assertThat(createResult.exitCode).isEqualTo(0)
+            assertThat(createResult.output).contains("Success! Your new Compose app is ready")
+
+            val compileResult = runProcess(
+                command = listOf(projectGradleScript(), ":composeApp:compileKotlinJvm"),
+                workingDir = projectDir,
+                timeoutSeconds = 180,
+            )
+
+            assertThat(compileResult.finished).isTrue()
+            assertThat(compileResult.exitCode).isEqualTo(0)
+            assertThat(compileResult.output).contains("BUILD SUCCESSFUL")
+        } finally {
+            rootDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `cli create-app requires overwrite for non-empty directories`() {
+        val rootDir = Files.createTempDirectory("composables-cli-create-app-existing").toFile()
+        try {
+            val projectDir = File(rootDir, "sample-app").apply {
+                mkdirs()
+                File(this, "keep.txt").writeText("existing")
+            }
+            val launcher = installedLauncher()
+
+            val createResult = runProcess(
+                command = listOf(
+                    launcher.absolutePath,
+                    "create-app",
+                    projectDir.absolutePath,
+                    "--package",
+                    "com.example.sampleapp",
+                    "--app-name",
+                    "Sample App",
+                    "--targets",
+                    "jvm",
+                ),
+                workingDir = rootDir,
+                timeoutSeconds = 60,
+            )
+
+            assertThat(createResult.finished).isTrue()
+            assertThat(createResult.exitCode).isEqualTo(1)
+            assertThat(createResult.output).contains("already exists and is not empty")
+        } finally {
+            rootDir.deleteRecursively()
+        }
+    }
+
     private fun installedLauncher(): File {
         val scriptName = if (System.getProperty("os.name").startsWith("Windows")) "composables.bat" else "composables"
         val launcher = File("build/install/composables/bin/$scriptName")
