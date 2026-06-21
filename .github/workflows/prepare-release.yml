@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   prepare:
@@ -75,11 +76,11 @@ jobs:
           distribution: 'jetbrains'
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
-          scope: '@composablehorizons'
+          package-manager-cache: false
 
       - name: Cache Gradle packages
         uses: actions/cache@v4
@@ -99,8 +100,6 @@ jobs:
 
       - name: Publish npm package
         run: npm publish cli/build/npm/package --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

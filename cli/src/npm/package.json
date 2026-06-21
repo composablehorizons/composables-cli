@@ -1,5 +1,5 @@
 {
-  "name": "@composablehorizons/composables",
+  "name": "composables-cli",
   "version": "${version}",
   "description": "Composables CLI",
   "license": "MIT",

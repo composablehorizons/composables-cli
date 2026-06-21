@@ -153,6 +153,10 @@ val npmPack = tasks.register<Exec>("npmPack") {
     outputs.dir(npmTarballDir)
 
     workingDir(npmPackageDir)
+    doFirst {
+        delete(npmTarballDir)
+        npmTarballDir.get().asFile.mkdirs()
+    }
     commandLine(npmCommand(), "pack", "--pack-destination", npmTarballDir.get().asFile.absolutePath)
 }
 
