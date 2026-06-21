@@ -75,12 +75,14 @@ class CliTest {
 
     @Test
     fun `init derives project name from absolute directory path`() {
+        val workingDir = File("workspace").absolutePath
+        val projectPath = File("sample-app").absolutePath
         val targetDir = resolveTargetDirectory(
-            workingDir = "/Users/alexstyl/projects/composables-cli",
-            projectPath = "/Users/alexstyl/projects/sample-app",
+            workingDir = workingDir,
+            projectPath = projectPath,
         )
 
-        assertThat(targetDir.absolutePath).isEqualTo("/Users/alexstyl/projects/sample-app")
+        assertThat(targetDir.absolutePath).isEqualTo(projectPath)
         assertThat(targetDir.name).isEqualTo("sample-app")
     }
 

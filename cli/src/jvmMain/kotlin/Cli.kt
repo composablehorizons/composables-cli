@@ -19,6 +19,8 @@ val JVM = "jvm"
 val IOS = "ios"
 val WEB = "web"
 
+private fun File.toResourcePath(): String = invariantSeparatorsPath.replace('\\', '/')
+
 suspend fun main(args: Array<String>) {
     ComposablesCli()
         .subcommands(Init(), Target())
@@ -874,7 +876,7 @@ fun DefaultPreview() {
                         dir.walkTopDown().forEach { file ->
                             if (file.isFile) {
                                 val relativePath = file.relativeTo(dir)
-                                resources.add("$path/${relativePath.path}")
+                                resources.add("$path/${relativePath.toResourcePath()}")
                             }
                         }
                     }
@@ -1414,7 +1416,7 @@ fun WebAppPreview() {
                         dir.walkTopDown().forEach { file ->
                             if (file.isFile) {
                                 val relativePath = file.relativeTo(dir)
-                                resources.add("$path/${relativePath.path}")
+                                resources.add("$path/${relativePath.toResourcePath()}")
                             }
                         }
                     }
@@ -1472,7 +1474,7 @@ fun WebAppPreview() {
                         dir.walkTopDown().forEach { file ->
                             if (file.isFile) {
                                 val relativePath = file.relativeTo(dir)
-                                resources.add("$path/${relativePath.path}")
+                                resources.add("$path/${relativePath.toResourcePath()}")
                             }
                         }
                     }
@@ -1544,7 +1546,7 @@ fun WebAppPreview() {
                         dir.walkTopDown().forEach { file ->
                             if (file.isFile) {
                                 val relativePath = file.relativeTo(dir)
-                                resources.add("$path/${relativePath.path}")
+                                resources.add("$path/${relativePath.toResourcePath()}")
                             }
                         }
                     }
@@ -1708,7 +1710,7 @@ private fun cloneGradleProjectAt(
                     dir.walkTopDown().forEach { file ->
                         if (file.isFile) { // Only include files, not directories
                             val relativePath = file.relativeTo(dir)
-                            resources.add("$path/${relativePath.path}")
+                            resources.add("$path/${relativePath.toResourcePath()}")
                         }
                     }
                 }
@@ -2421,7 +2423,7 @@ fun createModuleOnly(
                     dir.walkTopDown().forEach { file ->
                         if (file.isFile) {
                             val relativePath = file.relativeTo(dir)
-                            resources.add("$path/${relativePath.path}")
+                            resources.add("$path/${relativePath.toResourcePath()}")
                         }
                     }
                 }
@@ -2739,7 +2741,7 @@ private fun createIosAppDirectory(
                     dir.walkTopDown().forEach { file ->
                         if (file.isFile) {
                             val relativePath = file.relativeTo(dir)
-                            resources.add("$path/${relativePath.path}")
+                            resources.add("$path/${relativePath.toResourcePath()}")
                         }
                     }
                 }
