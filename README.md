@@ -8,12 +8,8 @@ Set up new Compose Multiplatform apps with a single command.
 ## Installation
 
 ```shell
-curl -fsSL https://composables.com/get-composables.sh | bash
+npm install -g composables-cli
 ```
-
-> [!WARNING]
-> The CLI tool has only be tested on Mac, but it should work on other platforms. If you face any issues with it, kindly open an issue.
-
 
 ## Quick Usage
 
