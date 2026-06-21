@@ -47,7 +47,7 @@ class CliIntegrationTest {
             assertThat(initResult.output).contains("Success! Your new Compose app is ready")
 
             val compileResult = runProcess(
-                command = listOf("./gradlew", ":composeApp:compileKotlinJvm"),
+                command = listOf(projectGradleScript(), ":composeApp:compileKotlinJvm"),
                 workingDir = projectDir,
                 timeoutSeconds = 180,
             )
@@ -73,13 +73,19 @@ class CliIntegrationTest {
         return jar
     }
 
+    private fun projectGradleScript(): String = if (System.getProperty("os.name").startsWith("Windows")) {
+        "gradlew.bat"
+    } else {
+        "./gradlew"
+    }
+
     private fun runProcess(
         command: List<String>,
         workingDir: File,
         stdin: String = "",
         timeoutSeconds: Long,
     ): ProcessResult {
-        val process = ProcessBuilder(command)
+        val process = ProcessBuilder(platformCommand(command))
             .directory(workingDir)
             .redirectErrorStream(true)
             .start()
@@ -111,6 +117,16 @@ class CliIntegrationTest {
             exitCode = if (finished) process.exitValue() else -1,
             output = output.toString(),
         )
+    }
+
+    private fun platformCommand(command: List<String>): List<String> {
+        val executable = command.firstOrNull() ?: return command
+        val isWindows = System.getProperty("os.name").startsWith("Windows")
+        return if (isWindows && (executable.endsWith(".bat") || executable.endsWith(".cmd"))) {
+            listOf("cmd.exe", "/c") + command
+        } else {
+            command
+        }
     }
 
     private data class ProcessResult(

@@ -75,12 +75,14 @@ class CliTest {
 
     @Test
     fun `init derives project name from absolute directory path`() {
+        val workingDir = File("workspace").absolutePath
+        val projectPath = File("sample-app").absolutePath
         val targetDir = resolveTargetDirectory(
-            workingDir = "/Users/alexstyl/projects/composables-cli",
-            projectPath = "/Users/alexstyl/projects/sample-app",
+            workingDir = workingDir,
+            projectPath = projectPath,
         )
 
-        assertThat(targetDir.absolutePath).isEqualTo("/Users/alexstyl/projects/sample-app")
+        assertThat(targetDir.absolutePath).isEqualTo(projectPath)
         assertThat(targetDir.name).isEqualTo("sample-app")
     }
 
@@ -139,12 +141,36 @@ class CliTest {
         }
     }
 
+    @Test
+    fun `gradleScript uses batch file on windows`() {
+        withOsName("Windows 11") {
+            assertThat(gradleScript).isEqualTo("gradlew.bat")
+        }
+    }
+
+    @Test
+    fun `gradleScript uses shell script on unix`() {
+        withOsName("Linux") {
+            assertThat(gradleScript).isEqualTo("./gradlew")
+        }
+    }
+
     private fun withTempDir(block: (File) -> Unit) {
         val dir = Files.createTempDirectory("composables-cli-test").toFile()
         try {
             block(dir)
         } finally {
             dir.deleteRecursively()
+        }
+    }
+
+    private fun withOsName(value: String, block: () -> Unit) {
+        val original = System.getProperty("os.name")
+        try {
+            System.setProperty("os.name", value)
+            block()
+        } finally {
+            System.setProperty("os.name", original)
         }
     }
 
