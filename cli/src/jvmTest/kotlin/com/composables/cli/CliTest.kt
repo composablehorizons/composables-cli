@@ -11,6 +11,7 @@ import assertk.assertions.isTrue
 import java.io.File
 import java.nio.file.Files
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
 
 class CliTest {
 
@@ -84,6 +85,22 @@ class CliTest {
 
         assertThat(targetDir.absolutePath).isEqualTo(projectPath)
         assertThat(targetDir.name).isEqualTo("sample-app")
+    }
+
+    @Test
+    fun `parseTargets normalizes and de-duplicates targets`() {
+        val targets = parseTargets("JVM, android, jvm, ios")
+
+        assertThat(targets).isEqualTo(linkedSetOf(JVM, ANDROID, IOS))
+    }
+
+    @Test
+    fun `parseTargets rejects unknown targets`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            parseTargets("android,desktop")
+        }
+
+        assertThat(error.message ?: "").contains("Unknown targets: desktop")
     }
 
     @Test
