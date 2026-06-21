@@ -2,14 +2,14 @@
 
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import org.gradle.api.tasks.JavaExec
-import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
-
 
 plugins {
-    alias(libs.plugins.multiplatform)
+    application
+    alias(libs.plugins.jvm)
     alias(libs.plugins.shadow)
     id("com.github.gmazzo.buildconfig") version "6.0.6"
 }
+
 val mainClassName = "com.composables.cli.CliKt"
 val cliName = "composables"
 
@@ -19,11 +19,6 @@ version = libs.versions.composables.cli.get()
 buildConfig {
     buildConfigField("Version", libs.versions.composables.cli.get())
 }
-
-val organization = "composablehorizons"
-
-val projectName = "composables-cli"
-val githubUrl = "github.com/$organization/$projectName"
 
 java {
     toolchain {
@@ -37,62 +32,52 @@ kotlin {
         vendor = JvmVendorSpec.JETBRAINS
         languageVersion = JavaLanguageVersion.of(17)
     }
+}
 
-    jvm {
-        binaries {
-            executable {
-                mainClass.set(mainClassName)
-            }
-        }
+application {
+    applicationName = cliName
+    mainClass.set(mainClassName)
+}
+
+sourceSets {
+    named("main") {
+        java.setSrcDirs(listOf("src/jvmMain/kotlin"))
+        resources.setSrcDirs(listOf("src/jvmMain/resources"))
     }
-
-    sourceSets {
-        val commonMain by getting {
-            dependencies {
-                implementation("com.alexstyl:debugln:1.0.3")
-                implementation("com.github.ajalt.clikt:clikt:5.0.3")
-            }
-        }
-
-        val jvmTest by getting {
-            dependencies {
-                implementation("com.willowtreeapps.assertk:assertk:0.28.1")
-                implementation(kotlin("test"))
-            }
-        }
+    named("test") {
+        java.setSrcDirs(listOf("src/jvmTest/kotlin"))
+        resources.setSrcDirs(emptyList<String>())
     }
 }
 
-// see: https://stackoverflow.com/questions/63426211/kotlin-multiplatform-shadowjar-gradle-plugin-creates-empty-jar
+dependencies {
+    implementation("com.alexstyl:debugln:1.0.3")
+    implementation("com.github.ajalt.clikt:clikt:5.0.3")
 
-fun registerShadowJar(targetName: String) {
-    kotlin.targets.named<KotlinJvmTarget>(targetName) {
-        compilations.named("main") {
-            tasks {
-                val shadowJar = register<ShadowJar>("${targetName}ShadowJar") {
-                    group = "build"
-                    from(output)
-                    from("src/jvmMain/resources/project") {
-                        into("project")
-                    }
-                    configurations = listOf(runtimeDependencyFiles)
-
-                    archiveFileName.set("$cliName.jar")
-
-                    manifest {
-                        attributes("Main-Class" to mainClassName)
-                    }
-                    mergeServiceFiles()
-                }
-                getByName("${targetName}Jar") {
-                    finalizedBy(shadowJar)
-                }
-            }
-        }
-    }
+    testImplementation("com.willowtreeapps.assertk:assertk:0.28.1")
+    testImplementation(kotlin("test"))
 }
 
-registerShadowJar("jvm")
+tasks.test {
+    useJUnitPlatform()
+}
+
+tasks.named<ShadowJar>("shadowJar") {
+    group = "build"
+    from(sourceSets.main.get().output)
+    configurations = listOf(project.configurations.runtimeClasspath.get())
+
+    archiveFileName.set("$cliName.jar")
+
+    manifest {
+        attributes("Main-Class" to mainClassName)
+    }
+    mergeServiceFiles()
+}
+
+tasks.jar {
+    finalizedBy(tasks.named("shadowJar"))
+}
 
 val devTemplateOutputDir = layout.buildDirectory.dir("dev-template")
 
@@ -100,13 +85,10 @@ tasks.register<JavaExec>("renderTemplate") {
     group = "application"
     description = "Renders the bundled project template into build/dev-template/app for local JVM template development."
 
-    dependsOn("jvmJar")
+    dependsOn(tasks.jar)
 
     mainClass.set("com.composables.cli.DevTemplateKt")
-    classpath(
-        tasks.named("jvmJar"),
-        configurations.getByName("jvmRuntimeClasspath"),
-    )
+    classpath(sourceSets.main.get().runtimeClasspath)
 
     systemProperty("composables.template.outputRoot", devTemplateOutputDir.get().asFile.absolutePath)
     systemProperty("composables.template.projectDir", "app")

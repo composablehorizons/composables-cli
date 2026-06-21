@@ -1746,7 +1746,6 @@ private fun cloneGradleProjectAt(
     targets: Set<String>,
     moduleName: String,
 ) {
-
     fun copyResource(resourcePath: String, targetFile: File) {
         val inputStream: InputStream? = object {}.javaClass.getResourceAsStream(resourcePath)
         if (inputStream != null) {
