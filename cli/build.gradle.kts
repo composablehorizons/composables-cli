@@ -82,6 +82,7 @@ val integrationTest = tasks.register<Test>("integrationTest") {
     classpath = integrationTestSourceSet.runtimeClasspath
     shouldRunAfter(tasks.test)
     dependsOn(tasks.named("installDist"))
+    dependsOn(tasks.named("shadowJar"))
     useJUnitPlatform()
 }
 

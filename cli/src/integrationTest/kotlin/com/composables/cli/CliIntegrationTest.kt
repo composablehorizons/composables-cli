@@ -2,6 +2,7 @@ package com.composables.cli
 
 import assertk.assertThat
 import assertk.assertions.contains
+import assertk.assertions.doesNotContain
 import assertk.assertions.isEqualTo
 import assertk.assertions.isTrue
 import java.io.File
@@ -10,6 +11,22 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 
 class CliIntegrationTest {
+
+    @Test
+    fun `published shadow jar runs standalone`() {
+        val shadowJar = shadowJarArtifact()
+
+        val result = runProcess(
+            command = listOf("java", "-jar", shadowJar.absolutePath, "--version"),
+            workingDir = shadowJar.parentFile,
+            timeoutSeconds = 60,
+        )
+
+        assertThat(result.finished).isTrue()
+        assertThat(result.exitCode).isEqualTo(0)
+        assertThat(Regex("""\d+\.\d+\.\d+""").matches(result.output.trim())).isTrue()
+        assertThat(result.output).doesNotContain("NoClassDefFoundError")
+    }
 
     @Test
     fun `cli init creates a jvm project that compiles`() {
@@ -48,6 +65,12 @@ class CliIntegrationTest {
         val launcher = File("build/install/composables/bin/$scriptName")
         check(launcher.isFile) { "Expected installed launcher at ${launcher.absolutePath}" }
         return launcher
+    }
+
+    private fun shadowJarArtifact(): File {
+        val jar = File("build/libs/composables.jar")
+        check(jar.isFile) { "Expected shadow jar at ${jar.absolutePath}" }
+        return jar
     }
 
     private fun runProcess(
