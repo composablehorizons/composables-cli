@@ -7,22 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-22
+
+### Added
+
+- Introduced the new `create-app` command to build apps. It is optimized for LLMs used as it exposes various params, the
+  LLMs can query and create apps in one go.
+
 ## [0.5.0] - 2026-06-21
 
 ### Added
-- The CLI is now distributed via [NPM](https://www.npmjs.com/package/composables-cli) and you can install it on Mac, Windows and Linux using `npm install -g composables-cli`.
+
+- The CLI is now distributed via [NPM](https://www.npmjs.com/package/composables-cli) and you can install it on Mac,
+  Windows and Linux using `npm install -g composables-cli`.
 - Added support for Windows and Linux.
 
 ### Removed
+
 - Removed the `update` command. We are no longer handling CLI updates and instead that is done via NPM.
 
 ### Fixed
+
 - `init` now correctly works with absolute output paths.
 - Generated projects now specify the correct root project name in `settings.gradle.kts`.
 
 ## [0.4.6] - 2026-06-18
 
 ### Added
+
 - The default component library in created apps is now [Composables UI](https://composables.com/ui).
 - WASM and JS apps are now preloaded for faster browser loading speed.
 - Testing infrastructure.
@@ -32,7 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.5] - 2025-12-10
 
 ### Fixed
-- Fixed a bug where the JVM and Web targets would have no sourceset generated. 
+
+- Fixed a bug where the JVM and Web targets would have no sourceset generated.
 - Fixed a crash after using the `update` command.
 - Fixed an issue where entering a prompt would be slower than normal.
 - Fixed the displayed output directory when creating apps or modules.
@@ -41,33 +54,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.1] - 2025-12-9
 
 ### Fixed
+
 - Added Kotlin 2.2.21 as a requirement when adding modules to existing Gradle projects, as it is required by Hot Reload.
 - Fix a problem where Android projects would not generate the iOS binary
 
 ## [0.4.0] - 2025-12-9
 
 ### Added
+
 - `init` can now add modules in existing Gradle Projects.
 
 ## [0.3.0] - 2025-12-8
 
 ### Added
+
 - NEW `target` command. You can now add new targets in existing Compose Multiplatform projects.
 
 ### Changed
+
 - All `init` options are now optional when creating a new app.
 
 ## [0.2.0] - 2025-12-7
 
 ### Added
-- You can now select the platforms when creating a new app.  
+
+- You can now select the platforms when creating a new app.
 
 ## [0.1.1] - 2025-12-6
 
 ### Fixed
+
 - Fix a bug where gradle-wrapper.jar is not copied to the new app
 
 ## [0.1.0] - 2025-12-6
 
-### Added 
+### Added
+
 - Add the option to create compose apps for all targets using `composables init composeApp`
