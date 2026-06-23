@@ -56,12 +56,12 @@ class CliTest {
             assertThat(buildContent).contains("mainClass = \"com.composables.demo.MainKt\"")
             assertThat(buildContent).doesNotContain("{{module_name}}")
 
-            assertThat(rootBuildContent).contains("composeCompatibilityBrowserDistribution")
-            assertThat(rootBuildContent).contains("jsBrowserDistribution")
-            assertThat(rootBuildContent).contains("wasmJsBrowserDistribution")
-            assertThat(rootBuildContent).contains("compose-web-compatibility-preloads")
-            assertThat(rootBuildContent).contains("js-preloads")
-            assertThat(rootBuildContent).contains("wasm-preloads")
+            assertThat(rootBuildContent).doesNotContain("composeCompatibilityBrowserDistribution")
+            assertThat(rootBuildContent).doesNotContain("jsBrowserDistribution")
+            assertThat(rootBuildContent).doesNotContain("wasmJsBrowserDistribution")
+            assertThat(rootBuildContent).doesNotContain("compose-web-compatibility-preloads")
+            assertThat(rootBuildContent).doesNotContain("js-preloads")
+            assertThat(rootBuildContent).doesNotContain("wasm-preloads")
             assertThat(settingsContent).contains("""rootProject.name = "newApp"""")
             assertThat(settingsContent).contains("""include(":desktopApp")""")
 
@@ -101,6 +101,33 @@ class CliTest {
         }
 
         assertThat(error.message ?: "").contains("Unknown targets: desktop")
+    }
+
+    @Test
+    fun `cloneGradleProject renders web preload wiring only when web target is selected`() {
+        withTempDir { targetDir ->
+            cloneGradleProject(
+                targetDir = targetDir.absolutePath,
+                dirName = "newApp",
+                packageName = "com.composables.demo",
+                moduleName = "composeApp",
+                appName = "The App",
+                targets = setOf(WEB),
+            )
+
+            val projectDir = File(targetDir, "newApp")
+            val rootBuildContent = File(projectDir, "build.gradle.kts").readText()
+            val moduleBuildContent = File(projectDir, "composeApp/build.gradle.kts").readText()
+
+            assertThat(rootBuildContent).contains("composeCompatibilityBrowserDistribution")
+            assertThat(rootBuildContent).contains("jsBrowserDistribution")
+            assertThat(rootBuildContent).contains("wasmJsBrowserDistribution")
+            assertThat(rootBuildContent).contains("compose-web-compatibility-preloads")
+            assertThat(rootBuildContent).contains("js-preloads")
+            assertThat(rootBuildContent).contains("wasm-preloads")
+            assertThat(moduleBuildContent).contains("js {")
+            assertThat(moduleBuildContent).contains("wasmJs {")
+        }
     }
 
     @Test
