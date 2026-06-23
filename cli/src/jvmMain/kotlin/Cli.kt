@@ -620,10 +620,11 @@ class Target : CliktCommand("target") {
         val composeDependencies = listOf(
             "compose.components.resources",
             "org.jetbrains.compose.ui:ui-tooling-preview",
+            "libs.compose.ui",
+            "libs.compose.ui.tooling.preview",
             "libs.composables.ui",
             "com.composables:ui:",
             "compose.desktop.currentOs",
-            "compose.preview",
             "compose.runtime",
         )
 
@@ -733,7 +734,7 @@ class Target : CliktCommand("target") {
         if (kotlinCloseIndex >= 0) {
             val androidTargetLines = listOf(
                 "",
-                "    androidLibrary {",
+                "    android {",
                 "        namespace = \"$namespace.shared\"",
                 "        compileSdk = libs.versions.android.compileSdk.get().toInt()",
                 "        minSdk = libs.versions.android.minSdk.get().toInt()",
@@ -1541,7 +1542,7 @@ private fun renderProjectTemplate(
     val kotlinTargets = buildList {
         if (normalizedTargets.contains(ANDROID)) {
             add(
-                """    androidLibrary {
+                """    android {
         namespace = "{{namespace}}.shared"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
@@ -1592,7 +1593,8 @@ activityCompose = "1.13.0"
         } else {
             ""
         },
-        "{{compose_libraries}}" to """compose-ui-tooling = { group = "org.jetbrains.compose.ui", name = "ui-tooling", version.ref = "compose" }
+        "{{compose_libraries}}" to """compose-ui = { group = "org.jetbrains.compose.ui", name = "ui", version.ref = "compose" }
+compose-ui-tooling = { group = "org.jetbrains.compose.ui", name = "ui-tooling", version.ref = "compose" }
 compose-ui-tooling-preview = { group = "org.jetbrains.compose.ui", name = "ui-tooling-preview", version.ref = "compose" }
 
 """,
@@ -1866,6 +1868,9 @@ fun updateVersionCatalog(
     val newLibraries = mutableListOf<String>()
     if (!hasLibraryVariable(librariesSection, "composables-ui")) {
         newLibraries.add("composables-ui = { group = \"com.composables\", name = \"ui\", version.ref = \"composablesUi\" }")
+    }
+    if (!hasLibraryVariable(librariesSection, "compose-ui")) {
+        newLibraries.add("compose-ui = { group = \"org.jetbrains.compose.ui\", name = \"ui\", version.ref = \"compose\" }")
     }
     if (!hasLibraryVariable(librariesSection, "compose-ui-tooling")) {
         newLibraries.add("compose-ui-tooling = { group = \"org.jetbrains.compose.ui\", name = \"ui-tooling\", version.ref = \"compose\" }")
