@@ -249,6 +249,19 @@ class CliIntegrationTest {
         assertThat(content).doesNotContain(":androidApp:installDebug")
         assertThat(content).doesNotContain("iosApp/iosApp.xcodeproj")
         assertThat(content).doesNotContain(":webApp:wasmJsBrowserDevelopmentRun")
+
+        val hotRunHelp = runProcess(
+            command = listOf(projectGradleScript(), "help", "--task", ":desktopApp:hotRunJvm"),
+            workingDir = projectDir,
+            timeoutSeconds = 180,
+        )
+
+        assertThat(hotRunHelp.finished).isTrue()
+        assertThat(hotRunHelp.exitCode).isEqualTo(0)
+        assertThat(hotRunHelp.output).contains("Path")
+        assertThat(hotRunHelp.output).contains(":desktopApp:hotRunJvm")
+        assertThat(hotRunHelp.output).contains("--auto")
+        assertThat(hotRunHelp.output).contains("Enables automatic recompilation/reload once the source files change")
     }
 
     private fun runProcess(
