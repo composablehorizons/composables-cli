@@ -20,9 +20,13 @@ import java.util.jar.JarFile
 val ANDROID = "android"
 val JVM = "jvm"
 val IOS = "ios"
-val WEB = "web"
+val WASM = "wasm"
 
 private fun File.toResourcePath(): String = invariantSeparatorsPath.replace('\\', '/')
+
+private fun normalizeTargets(targets: Set<String>): LinkedHashSet<String> = linkedSetOf<String>().apply {
+    addAll(targets)
+}
 
 suspend fun main(args: Array<String>) {
     ComposablesCli()
@@ -56,7 +60,7 @@ class CreateApp : CliktCommand("create-app") {
     private val directory by argument("directory", help = "The directory path to create the new app in").optional()
     private val packageName by option("--package", help = "The package name for the generated app")
     private val appName by option("--app-name", help = "The display name for the generated app")
-    private val targetsInput by option("--targets", help = "Comma-separated targets: android,jvm,ios,web")
+    private val targetsInput by option("--targets", help = "Comma-separated targets: android,jvm,ios,wasm")
     private val overwrite by option("--overwrite", help = "Overwrite an existing target directory").flag(default = false)
 
     override fun run() {
@@ -419,10 +423,10 @@ internal fun readTargets(): Set<String> {
         }
 
         while (true) {
-            print("Web (y/n, default: y): ")
-            val web = readln().trim().lowercase()
-            if (web.isEmpty() || web == "y" || web == "yes") {
-                targets.add(WEB)
+            print("Wasm (Browser) (y/n, default: y): ")
+            val wasm = readln().trim().lowercase()
+            if (wasm.isEmpty() || wasm == "y" || wasm == "yes") {
+                targets.add(WASM)
             }
             break
         }
@@ -460,20 +464,20 @@ internal fun isValidPackageName(packageName: String): Boolean {
 }
 
 internal fun parseTargets(targetsInput: String): Set<String> {
-    val validTargets = setOf(ANDROID, JVM, IOS, WEB)
+    val validTargets = setOf(ANDROID, JVM, IOS, WASM)
     val targets = targetsInput
         .split(",")
         .map { it.trim().lowercase() }
         .filter { it.isNotEmpty() }
 
     if (targets.isEmpty()) {
-        throw IllegalArgumentException("At least one target is required. Use --targets android,jvm,ios,web")
+        throw IllegalArgumentException("At least one target is required. Use --targets android,jvm,ios,wasm")
     }
 
     val invalidTargets = targets.filterNot { it in validTargets }
     if (invalidTargets.isNotEmpty()) {
         throw IllegalArgumentException(
-            "Unknown targets: ${invalidTargets.joinToString(", ")}. Available targets: android, jvm, ios, web",
+            "Unknown targets: ${invalidTargets.joinToString(", ")}. Available targets: android, jvm, ios, wasm",
         )
     }
 
@@ -494,17 +498,17 @@ private fun toCamelCase(input: String): String = input.split(Regex("[-_]"))
 
 class Target : CliktCommand("target") {
     override fun help(context: Context): String = """
-        Adds a new Kotlin target to the current Compose Multiplatform project (options: android, jvm, ios, web).
+        Adds a new Kotlin target to the current Compose Multiplatform project (options: android, jvm, ios, wasm).
     """.trimIndent()
 
     private val targetName by argument(name = "target")
 
     override fun run() {
-        val validTargets = setOf("android", "jvm", "ios", "web")
+        val validTargets = setOf("android", "jvm", "ios", "wasm")
 
         if (targetName !in validTargets) {
             echo("Unknown target '$targetName'")
-            echo("Available targets: android, jvm, ios, web")
+            echo("Available targets: android, jvm, ios, wasm")
             echo("Usage: composables target <target-name>")
             return
         }
@@ -514,7 +518,7 @@ class Target : CliktCommand("target") {
         if (!isValidComposeAppDirectory(workingDir)) {
             echo("This doesn't appear to be a Compose Multiplatform project.")
             echo("To create a new Compose app, run:")
-            echo("    composables create-app app --package com.example.app --app-name \"My App\" --targets android,jvm,ios,web")
+            echo("    composables create-app app --package com.example.app --app-name \"My App\" --targets android,jvm,ios,wasm")
             return
         }
 
@@ -567,17 +571,17 @@ class Target : CliktCommand("target") {
                 }
             }
 
-            "web" -> {
-                if (hasWebTarget(composeModuleBuildFile)) {
-                    echo("Web target is already configured in this project.")
+            "wasm" -> {
+                if (hasWasmTarget(composeModuleBuildFile)) {
+                    echo("Wasm target is already configured in this project.")
                     return
                 }
                 try {
-                    addWebTarget(workingDir, composeModuleBuildFile)
-                    echo("Web target added successfully!")
+                    addWasmTarget(workingDir, composeModuleBuildFile)
+                    echo("Wasm target added successfully!")
                     echo("Run '$gradleScript build' to verify the configuration.")
                 } catch (e: Exception) {
-                    echo("Failed to add web target: ${e.message}", err = true)
+                    echo("Failed to add wasm target: ${e.message}", err = true)
                 }
             }
         }
@@ -677,9 +681,9 @@ class Target : CliktCommand("target") {
         return content.contains("iosArm64()") || content.contains("iosSimulatorArm64()")
     }
 
-    private fun hasWebTarget(buildFile: File): Boolean {
+    private fun hasWasmTarget(buildFile: File): Boolean {
         val content = buildFile.readText()
-        return content.contains("js(") || content.contains("wasmJs(")
+        return content.contains("wasmJs(")
     }
 
     private fun addAndroidTarget(workingDir: String, buildFile: File) {
@@ -1369,7 +1373,7 @@ fun IosAppPreview() {
         mainFile.writeText(mainContent)
     }
 
-    private fun addWebTarget(workingDir: String, buildFile: File) {
+    private fun addWasmTarget(workingDir: String, buildFile: File) {
         var content = buildFile.readText()
         val lines = content.lines().toMutableList()
 
@@ -1403,24 +1407,7 @@ fun IosAppPreview() {
         // Append to kotlin block
         val kotlinCloseIndex = findKotlinBlockEnd(lines)
         if (kotlinCloseIndex >= 0) {
-            val webTargetLines = listOf(
-                "",
-                "    js {",
-                "        browser {",
-                "            val rootDirPath = project.rootDir.path",
-                "            val projectDirPath = project.projectDir.path",
-                "            commonWebpackConfig {",
-                "                outputFileName = \"composeApp.js\"",
-                "                devServer = (devServer ?: KotlinWebpackConfig.DevServer()).apply {",
-                "                    static = (static ?: mutableListOf()).apply {",
-                "                        add(rootDirPath)",
-                "                        add(projectDirPath)",
-                "                    }",
-                "                }",
-                "            }",
-                "        }",
-                "        binaries.executable()",
-                "    }",
+            val wasmTargetLines = listOf(
                 "",
                 "    @OptIn(ExperimentalWasmDsl::class)",
                 "    wasmJs {",
@@ -1440,29 +1427,15 @@ fun IosAppPreview() {
                 "        binaries.executable()",
                 "    }",
             )
-            webTargetLines.reversed().forEach { line ->
+            wasmTargetLines.reversed().forEach { line ->
                 lines.add(kotlinCloseIndex, line)
-            }
-        }
-
-        // Append to sourceSets block
-        val sourceSetsCloseIndex = findSourceSetsBlockEnd(lines)
-        if (sourceSetsCloseIndex >= 0) {
-            val webMainLines = listOf(
-                "",
-                "        jsMain.dependencies {",
-                "            implementation(\"com.composables:ui:0.1.0\")",
-                "        }",
-            )
-            webMainLines.reversed().forEach { line ->
-                lines.add(sourceSetsCloseIndex, line)
             }
         }
 
         // Write updated content
         buildFile.writeText(lines.joinToString("\n"))
 
-        // Create web source sets
+        // Create browser source sets
         val moduleDir = buildFile.parentFile
         createWebSourceSets(moduleDir, extractNamespace(lines))
 
@@ -1807,12 +1780,13 @@ fun cloneGradleProject(
     targets: Set<String>,
     moduleName: String,
 ) {
+    val normalizedTargets = normalizeTargets(targets)
     val target = File(targetDir).resolve(dirName)
     cloneGradleProjectAt(
         target = target,
         packageName = packageName,
         appName = appName,
-        targets = targets,
+        targets = normalizedTargets,
         moduleName = moduleName,
     )
 }
@@ -1824,6 +1798,7 @@ private fun cloneGradleProjectAt(
     targets: Set<String>,
     moduleName: String,
 ) {
+    val normalizedTargets = normalizeTargets(targets)
     fun copyResource(resourcePath: String, targetFile: File) {
         val inputStream: InputStream? = object {}.javaClass.getResourceAsStream(resourcePath)
         if (inputStream != null) {
@@ -1895,7 +1870,7 @@ private fun cloneGradleProjectAt(
 
         // Skip iOS directory if iOS target is not selected
         val iosAppName = "ios${toCamelCase(moduleName)}"
-        if (!targets.contains("ios") && targetPath.startsWith("iosApp/")) {
+        if (!normalizedTargets.contains(IOS) && targetPath.startsWith("iosApp/")) {
             return@forEach
         }
 
@@ -1905,19 +1880,18 @@ private fun cloneGradleProjectAt(
             val sourceSetType = targetPath.substringAfter("composeApp/src/").substringBefore("/")
 
             when (sourceSetType) {
-                "androidMain" -> if (!targets.contains("android")) return@forEach
-                "iosMain" -> if (!targets.contains("ios")) return@forEach
-                "jvmMain" -> if (!targets.contains("jvm")) return@forEach
-                "jsMain" -> if (!targets.contains("web")) return@forEach
-                "wasmJsMain" -> if (!targets.contains("web")) return@forEach
-                "webMain" -> if (!targets.contains("web")) return@forEach
+                "androidMain" -> if (!normalizedTargets.contains(ANDROID)) return@forEach
+                "iosMain" -> if (!normalizedTargets.contains(IOS)) return@forEach
+                "jvmMain" -> if (!normalizedTargets.contains(JVM)) return@forEach
+                "jsMain" -> return@forEach
+                "wasmJsMain" -> if (!normalizedTargets.contains(WASM)) return@forEach
+                "webMain" -> if (!normalizedTargets.contains(WASM)) return@forEach
                 "commonMain" -> Unit
                 else -> error("Unknown target: $targetPath")
             }
         }
 
-        // Skip webpack.config.d directory if web target is not selected
-        if (!targets.contains("web") && targetPath.startsWith("$moduleName/webpack.config.d/")) {
+        if (!normalizedTargets.contains(WASM) && targetPath.startsWith("$moduleName/webpack.config.d/")) {
             return@forEach
         }
 
@@ -1957,7 +1931,7 @@ private fun cloneGradleProjectAt(
                 val content = file.readText()
                 var updatedContent = content.replace("{{app_name}}", appName)
 
-                val androidVersions = if (targets.contains("android")) {
+                val androidVersions = if (normalizedTargets.contains(ANDROID)) {
                     """# Android
 agp = "9.0.0"
 android-compileSdk = "37"
@@ -1971,7 +1945,7 @@ activityCompose = "1.13.0"
                 }
 
                 val androidLibraries =
-                    if (targets.contains("android")) {
+                    if (normalizedTargets.contains(ANDROID)) {
                         """androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 
 """
@@ -1980,17 +1954,17 @@ activityCompose = "1.13.0"
                     }
 
                 val androidPlugins =
-                    if (targets.contains("android")) """android-application = { id = "com.android.application", version.ref = "agp" }""" else ""
+                    if (normalizedTargets.contains(ANDROID)) """android-application = { id = "com.android.application", version.ref = "agp" }""" else ""
 
                 val androidPlugin =
-                    if (targets.contains("android")) {
+                    if (normalizedTargets.contains(ANDROID)) {
                         """    alias(libs.plugins.android.application) apply false
 """
                     } else {
                         ""
                     }
 
-                val androidProperties = if (targets.contains("android")) {
+                val androidProperties = if (normalizedTargets.contains(ANDROID)) {
                     """#Android
 android.nonTransitiveRClass=true
 android.useAndroidX=true
@@ -1999,7 +1973,7 @@ android.useAndroidX=true
                     ""
                 }
 
-                val webPreloadTaskWiring = if (targets.contains("web")) {
+                val webPreloadTaskWiring = if (normalizedTargets.contains(WASM)) {
                     """
 subprojects {
     fun registerPreloadInjectionTask(
@@ -2051,32 +2025,14 @@ subprojects {
         }
     }
 
-    val injectJsPreloads = registerPreloadInjectionTask(
-        distributionTarget = "js",
-        markerName = "js-preloads",
-        includeWasmArtifacts = false,
-    )
     val injectWasmPreloads = registerPreloadInjectionTask(
         distributionTarget = "wasmJs",
         markerName = "wasm-preloads",
         includeWasmArtifacts = true,
     )
-    val injectComposeWebCompatibilityPreloads = registerPreloadInjectionTask(
-        distributionTarget = "composeWebCompatibility",
-        markerName = "compose-web-compatibility-preloads",
-        includeWasmArtifacts = true,
-    )
 
-    tasks.matching { it.name in setOf("composeCompatibilityBrowserDistribution", "jsBrowserDistribution") }.configureEach {
-        finalizedBy(injectJsPreloads)
-    }
-
-    tasks.matching { it.name in setOf("composeCompatibilityBrowserDistribution", "wasmJsBrowserDistribution") }.configureEach {
+    tasks.matching { it.name == "wasmJsBrowserDistribution" }.configureEach {
         finalizedBy(injectWasmPreloads)
-    }
-
-    tasks.matching { it.name == "composeCompatibilityBrowserDistribution" }.configureEach {
-        finalizedBy(injectComposeWebCompatibilityPreloads)
     }
 }
                     """.trimIndent()
@@ -2086,14 +2042,14 @@ subprojects {
 
                 // Build imports block
                 val imports = mutableListOf<String>()
-                if (targets.contains("jvm")) {
+                if (normalizedTargets.contains(JVM)) {
                     imports.add("import org.jetbrains.compose.desktop.application.dsl.TargetFormat")
                 }
-                if (targets.contains("web")) {
+                if (normalizedTargets.contains(WASM)) {
                     imports.add("import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl")
                     imports.add("import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig")
                 }
-                if (targets.contains("android")) {
+                if (normalizedTargets.contains(ANDROID)) {
                     imports.add("import org.jetbrains.kotlin.gradle.dsl.JvmTarget")
                 }
                 val importsBlock = if (imports.isNotEmpty()) imports.joinToString("\n") + "\n" else ""
@@ -2107,14 +2063,14 @@ subprojects {
                     plugins.add("    alias(libs.plugins.jetbrains.compose.compiler)")
                 }
                 plugins.add("    alias(libs.plugins.jetbrains.compose.hotreload)")
-                if (targets.contains("android")) {
+                if (normalizedTargets.contains(ANDROID)) {
                     plugins.add("    alias(libs.plugins.android.application)")
                 }
                 val pluginsBlock = "plugins {\n" + plugins.joinToString("\n") + "\n}"
 
                 // Build kotlin targets block
                 val kotlinTargets = mutableListOf<String>()
-                if (targets.contains("android")) {
+                if (normalizedTargets.contains(ANDROID)) {
                     kotlinTargets.add(
                         """    androidTarget {
         compilerOptions {
@@ -2123,7 +2079,7 @@ subprojects {
     }""",
                     )
                 }
-                if (targets.contains("ios")) {
+                if (normalizedTargets.contains(IOS)) {
                     val baseName = toCamelCase(moduleName)
                     kotlinTargets.add(
                         """    listOf(
@@ -2137,28 +2093,10 @@ subprojects {
     }""",
                     )
                 }
-                if (targets.contains("jvm")) {
+                if (normalizedTargets.contains(JVM)) {
                     kotlinTargets.add("    jvm()")
                 }
-                if (targets.contains("web")) {
-                    kotlinTargets.add(
-                        """    js {
-        browser {
-            val rootDirPath = project.rootDir.path
-            val projectDirPath = project.projectDir.path
-            commonWebpackConfig {
-                outputFileName = "composeApp.js"
-                devServer = (devServer ?: KotlinWebpackConfig.DevServer()).apply {
-                    static = (static ?: mutableListOf()).apply {
-                        add(rootDirPath)
-                        add(projectDirPath)
-                    }
-                }
-            }
-        }
-        binaries.executable()
-    }""",
-                    )
+                if (normalizedTargets.contains(WASM)) {
                     kotlinTargets.add(
                         """    @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
@@ -2193,14 +2131,14 @@ subprojects {
         }""",
                 )
 
-                if (targets.contains("jvm")) {
+                if (normalizedTargets.contains(JVM)) {
                     sourcesets.add(
                         """        jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
         }""",
                     )
                 }
-                if (targets.contains("android")) {
+                if (normalizedTargets.contains(ANDROID)) {
                     sourcesets.add(
                         """        androidMain.dependencies {
             implementation(compose.preview)
@@ -2213,7 +2151,7 @@ subprojects {
 
                 // Build configuration blocks
                 val configurations = mutableListOf<String>()
-                if (targets.contains("android")) {
+                if (normalizedTargets.contains(ANDROID)) {
                     configurations.add(
                         """android {
     namespace = "{{namespace}}"
@@ -2243,7 +2181,7 @@ subprojects {
 }""",
                     )
                 }
-                if (targets.contains("jvm")) {
+                if (normalizedTargets.contains(JVM)) {
                     configurations.add(
                         """compose.desktop {
     application {
@@ -2261,7 +2199,7 @@ subprojects {
                 val configurationBlocksBlock =
                     if (configurations.isNotEmpty()) configurations.joinToString("\n\n") else ""
 
-                val composeDesktop = if (targets.contains("jvm")) {
+                val composeDesktop = if (normalizedTargets.contains(JVM)) {
                     """compose.desktop {
     application {
         mainClass = "{{namespace}}.MainDesktopKt"
@@ -2277,7 +2215,7 @@ subprojects {
                     ""
                 }
 
-                val androidMainDependencies = if (targets.contains("android")) {
+                val androidMainDependencies = if (normalizedTargets.contains(ANDROID)) {
                     """        androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
@@ -2286,7 +2224,7 @@ subprojects {
                     ""
                 }
 
-                val androidBlock = if (targets.contains("android")) {
+                val androidBlock = if (normalizedTargets.contains(ANDROID)) {
                     """android {
     namespace = "{{namespace}}"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -2351,7 +2289,7 @@ subprojects {
     }
 
     // Link iOS project for IDE if iOS target was included
-    if (targets.contains("ios")) {
+    if (normalizedTargets.contains(IOS)) {
         try {
             debugln { "Preparing iOS target..." }
             val process = ProcessBuilder(gradleScript, "compileIosMainKotlinMetadata", "--quiet")
@@ -2374,6 +2312,7 @@ fun updateRootBuildFile(
     targetDir: String,
     targets: Set<String>,
 ) {
+    val normalizedTargets = normalizeTargets(targets)
     val buildFile = File(targetDir, "build.gradle.kts")
     if (!buildFile.exists()) {
         warnln { "build.gradle.kts not found in $targetDir" }
@@ -2418,7 +2357,7 @@ fun updateRootBuildFile(
         if (!pluginsContent.contains("libs.plugins.jetbrains.compose.hotreload")) {
             requiredPlugins.add("    alias(libs.plugins.jetbrains.compose.hotreload) apply false")
         }
-        if (targets.contains("android") && !pluginsContent.contains("libs.plugins.android.application")) {
+        if (normalizedTargets.contains(ANDROID) && !pluginsContent.contains("libs.plugins.android.application")) {
             requiredPlugins.add("    alias(libs.plugins.android.application) apply false")
         }
 
@@ -2437,7 +2376,7 @@ fun updateRootBuildFile(
         requiredPlugins.add("    alias(libs.plugins.jetbrains.compose) apply false")
         requiredPlugins.add("    alias(libs.plugins.jetbrains.compose.compiler) apply false")
         requiredPlugins.add("    alias(libs.plugins.jetbrains.compose.hotreload) apply false")
-        if (targets.contains("android")) {
+        if (normalizedTargets.contains(ANDROID)) {
             requiredPlugins.add("    alias(libs.plugins.android.application) apply false")
         }
         requiredPlugins.add("}")
@@ -2635,6 +2574,7 @@ fun createModuleOnly(
     appName: String,
     targets: Set<String>,
 ) {
+    val normalizedTargets = normalizeTargets(targets)
     val moduleDir = File(targetDir, moduleName)
 
     fun copyResource(resourcePath: String, targetFile: File) {
@@ -2697,19 +2637,18 @@ fun createModuleOnly(
         if (isInsideAKotlinSourceSet) {
             val sourceSetType = targetPath.substringAfter("src/").substringBefore("/")
             when (sourceSetType) {
-                "androidMain" -> if (!targets.contains("android")) return@forEach
-                "iosMain" -> if (!targets.contains("ios")) return@forEach
-                "jvmMain" -> if (!targets.contains("jvm")) return@forEach
-                "jsMain" -> if (!targets.contains("web")) return@forEach
-                "wasmJsMain" -> if (!targets.contains("web")) return@forEach
-                "webMain" -> if (!targets.contains("web")) return@forEach
+                "androidMain" -> if (!normalizedTargets.contains(ANDROID)) return@forEach
+                "iosMain" -> if (!normalizedTargets.contains(IOS)) return@forEach
+                "jvmMain" -> if (!normalizedTargets.contains(JVM)) return@forEach
+                "jsMain" -> return@forEach
+                "wasmJsMain" -> if (!normalizedTargets.contains(WASM)) return@forEach
+                "webMain" -> if (!normalizedTargets.contains(WASM)) return@forEach
                 "commonMain" -> Unit
                 else -> error("Unknown target: $targetPath")
             }
         }
 
-        // Skip webpack.config.d directory if web target is not selected
-        if (!targets.contains("web") && targetPath.startsWith("webpack.config.d/")) {
+        if (!normalizedTargets.contains(WASM) && targetPath.startsWith("webpack.config.d/")) {
             return@forEach
         }
 
@@ -2741,14 +2680,14 @@ fun createModuleOnly(
 
                 // Build imports block
                 val imports = mutableListOf<String>()
-                if (targets.contains("jvm")) {
+                if (normalizedTargets.contains(JVM)) {
                     imports.add("import org.jetbrains.compose.desktop.application.dsl.TargetFormat")
                 }
-                if (targets.contains("web")) {
+                if (normalizedTargets.contains(WASM)) {
                     imports.add("import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl")
                     imports.add("import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig")
                 }
-                if (targets.contains("android")) {
+                if (normalizedTargets.contains(ANDROID)) {
                     imports.add("import org.jetbrains.kotlin.gradle.dsl.JvmTarget")
                 }
                 val importsBlock = if (imports.isNotEmpty()) imports.joinToString("\n") + "\n" else ""
@@ -2762,14 +2701,14 @@ fun createModuleOnly(
                     plugins.add("    alias(libs.plugins.jetbrains.compose.compiler)")
                 }
                 plugins.add("    alias(libs.plugins.jetbrains.compose.hotreload)")
-                if (targets.contains("android")) {
+                if (normalizedTargets.contains(ANDROID)) {
                     plugins.add("    alias(libs.plugins.android.application)")
                 }
                 val pluginsBlock = "plugins {\n" + plugins.joinToString("\n") + "\n}"
 
                 // Build kotlin targets block
                 val kotlinTargets = mutableListOf<String>()
-                if (targets.contains("android")) {
+                if (normalizedTargets.contains(ANDROID)) {
                     kotlinTargets.add(
                         """    androidTarget {
         compilerOptions {
@@ -2778,7 +2717,7 @@ fun createModuleOnly(
     }""",
                     )
                 }
-                if (targets.contains("ios")) {
+                if (normalizedTargets.contains(IOS)) {
                     val baseName = toCamelCase(moduleName)
                     kotlinTargets.add(
                         """    listOf(
@@ -2792,28 +2731,10 @@ fun createModuleOnly(
     }""",
                     )
                 }
-                if (targets.contains("jvm")) {
+                if (normalizedTargets.contains(JVM)) {
                     kotlinTargets.add("    jvm()")
                 }
-                if (targets.contains("web")) {
-                    kotlinTargets.add(
-                        """    js {
-        browser {
-            val rootDirPath = project.rootDir.path
-            val projectDirPath = project.projectDir.path
-            commonWebpackConfig {
-                outputFileName = "composeApp.js"
-                devServer = (devServer ?: KotlinWebpackConfig.DevServer()).apply {
-                    static = (static ?: mutableListOf()).apply {
-                        add(rootDirPath)
-                        add(projectDirPath)
-                    }
-                }
-            }
-        }
-        binaries.executable()
-    }""",
-                    )
+                if (normalizedTargets.contains(WASM)) {
                     kotlinTargets.add(
                         """    @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
@@ -2848,14 +2769,14 @@ fun createModuleOnly(
         }""",
                 )
 
-                if (targets.contains("jvm")) {
+                if (normalizedTargets.contains(JVM)) {
                     sourcesets.add(
                         """        jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
         }""",
                     )
                 }
-                if (targets.contains("android")) {
+                if (normalizedTargets.contains(ANDROID)) {
                     sourcesets.add(
                         """        androidMain.dependencies {
             implementation(compose.preview)
@@ -2868,7 +2789,7 @@ fun createModuleOnly(
 
                 // Build configuration blocks
                 val configurations = mutableListOf<String>()
-                if (targets.contains("android")) {
+                if (normalizedTargets.contains(ANDROID)) {
                     configurations.add(
                         """android {
     namespace = "{{namespace}}"
@@ -2898,7 +2819,7 @@ fun createModuleOnly(
 }""",
                     )
                 }
-                if (targets.contains("jvm")) {
+                if (normalizedTargets.contains(JVM)) {
                     configurations.add(
                         """compose.desktop {
     application {

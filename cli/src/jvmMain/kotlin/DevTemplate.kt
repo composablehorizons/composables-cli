@@ -46,11 +46,11 @@ private fun parseTargets(rawTargets: String?): Set<String> {
         ?.map { it.trim() }
         ?.filter { it.isNotEmpty() }
         ?.toSet()
-        ?: setOf(ANDROID, JVM, IOS, WEB)
+        ?: setOf(ANDROID, JVM, IOS, WASM)
 
     require(parsedTargets.isNotEmpty()) { "At least one target is required" }
-    require(parsedTargets.all { it in setOf(ANDROID, JVM, IOS, WEB) }) {
-        "Unsupported targets: ${parsedTargets.filterNot { it in setOf(ANDROID, JVM, IOS, WEB) }}"
+    require(parsedTargets.all { it in setOf(ANDROID, JVM, IOS, WASM) }) {
+        "Unsupported targets: ${parsedTargets.filterNot { it in setOf(ANDROID, JVM, IOS, WASM) }}"
     }
 
     return parsedTargets

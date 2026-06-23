@@ -104,7 +104,7 @@ class CliTest {
     }
 
     @Test
-    fun `cloneGradleProject renders web preload wiring only when web target is selected`() {
+    fun `cloneGradleProject renders wasm preload wiring only when wasm target is selected`() {
         withTempDir { targetDir ->
             cloneGradleProject(
                 targetDir = targetDir.absolutePath,
@@ -112,20 +112,20 @@ class CliTest {
                 packageName = "com.composables.demo",
                 moduleName = "composeApp",
                 appName = "The App",
-                targets = setOf(WEB),
+                targets = setOf(WASM),
             )
 
             val projectDir = File(targetDir, "newApp")
             val rootBuildContent = File(projectDir, "build.gradle.kts").readText()
             val moduleBuildContent = File(projectDir, "composeApp/build.gradle.kts").readText()
 
-            assertThat(rootBuildContent).contains("composeCompatibilityBrowserDistribution")
-            assertThat(rootBuildContent).contains("jsBrowserDistribution")
             assertThat(rootBuildContent).contains("wasmJsBrowserDistribution")
-            assertThat(rootBuildContent).contains("compose-web-compatibility-preloads")
-            assertThat(rootBuildContent).contains("js-preloads")
             assertThat(rootBuildContent).contains("wasm-preloads")
-            assertThat(moduleBuildContent).contains("js {")
+            assertThat(rootBuildContent).doesNotContain("composeCompatibilityBrowserDistribution")
+            assertThat(rootBuildContent).doesNotContain("jsBrowserDistribution")
+            assertThat(rootBuildContent).doesNotContain("compose-web-compatibility-preloads")
+            assertThat(rootBuildContent).doesNotContain("js-preloads")
+            assertThat(moduleBuildContent).doesNotContain("js {")
             assertThat(moduleBuildContent).contains("wasmJs {")
         }
     }
