@@ -4,7 +4,6 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.multiplatform)
     alias(libs.plugins.jetbrains.compose)
     alias(libs.plugins.jetbrains.compose.compiler)
-    alias(libs.plugins.jetbrains.compose.hotreload)
 }
 
 kotlin {

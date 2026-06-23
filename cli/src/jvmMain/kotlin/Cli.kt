@@ -33,6 +33,37 @@ private fun normalizeTargets(targets: Set<String>): LinkedHashSet<String> = link
     addAll(targets)
 }
 
+private fun buildProjectReadme(
+    projectName: String,
+    targets: Set<String>,
+): String {
+    val normalizedTargets = normalizeTargets(targets)
+    val lines = mutableListOf<String>()
+
+    lines += "# $projectName"
+    lines += ""
+    lines += "## Run"
+    lines += ""
+    lines += "From the project root:"
+    lines += ""
+
+    if (normalizedTargets.contains(JVM)) {
+        lines += "- JVM: `./gradlew :$DESKTOP_APP_MODULE:hotRunJvm --auto`"
+    }
+    if (normalizedTargets.contains(ANDROID)) {
+        lines += "- Android: open the project in Android Studio and run the `$ANDROID_APP_MODULE` app on a device or emulator"
+        lines += "- Android install from terminal: `./gradlew :$ANDROID_APP_MODULE:installDebug`"
+    }
+    if (normalizedTargets.contains(IOS)) {
+        lines += "- iOS: open `$IOS_APP_MODULE/$IOS_APP_MODULE.xcodeproj` in Xcode and run the app on a simulator or device"
+    }
+    if (normalizedTargets.contains(WASM)) {
+        lines += "- Wasm: `./gradlew :$WEB_APP_MODULE:wasmJsBrowserDevelopmentRun`"
+    }
+
+    return lines.joinToString("\n") + "\n"
+}
+
 suspend fun main(args: Array<String>) {
     ComposablesCli()
         .subcommands(CreateApp(), Init(), Target())
@@ -1338,7 +1369,7 @@ fun cloneGradleProjectAndPrint(
     infoln { "" }
     infoln { "\tcd ${target.absolutePath}" }
     val startCommand = when {
-        targets.contains(JVM) -> "$gradleScript :$DESKTOP_APP_MODULE:run"
+        targets.contains(JVM) -> "$gradleScript :$DESKTOP_APP_MODULE:hotRunJvm --auto"
         targets.contains(WASM) -> "$gradleScript :$WEB_APP_MODULE:wasmJsBrowserDevelopmentRun"
         else -> "$gradleScript build"
     }
@@ -1517,6 +1548,13 @@ private fun cloneGradleProjectAt(
             }
         }
     }
+
+    File(target, "README.md").writeText(
+        buildProjectReadme(
+            projectName = target.name,
+            targets = normalizedTargets,
+        ),
+    )
 }
 
 private fun renderProjectTemplate(
@@ -1778,9 +1816,6 @@ fun updateRootBuildFile(
                 requiredPlugins.add("    alias(libs.plugins.jetbrains.compose.compiler) apply false")
             }
         }
-        if (!pluginsContent.contains("libs.plugins.jetbrains.compose.hotreload")) {
-            requiredPlugins.add("    alias(libs.plugins.jetbrains.compose.hotreload) apply false")
-        }
         if (normalizedTargets.contains(ANDROID) && !pluginsContent.contains("libs.plugins.android.application")) {
             requiredPlugins.add("    alias(libs.plugins.android.application) apply false")
         }
@@ -1802,7 +1837,6 @@ fun updateRootBuildFile(
         requiredPlugins.add("    alias(libs.plugins.jetbrains.kotlin.multiplatform) apply false")
         requiredPlugins.add("    alias(libs.plugins.jetbrains.compose) apply false")
         requiredPlugins.add("    alias(libs.plugins.jetbrains.compose.compiler) apply false")
-        requiredPlugins.add("    alias(libs.plugins.jetbrains.compose.hotreload) apply false")
         if (normalizedTargets.contains(ANDROID)) {
             requiredPlugins.add("    alias(libs.plugins.android.application) apply false")
             requiredPlugins.add("    alias(libs.plugins.android.kotlin.multiplatform.library) apply false")
@@ -1852,9 +1886,6 @@ fun updateVersionCatalog(
     if (!hasVersionVariable(versionsSection, "compose")) {
         newVersions.add("compose = \"1.11.1\"")
     }
-    if (!hasVersionVariable(versionsSection, "composeHotReload")) {
-        newVersions.add("composeHotReload = \"1.1.0\"")
-    }
     if (!hasVersionVariable(versionsSection, "composablesUi")) {
         newVersions.add("composablesUi = \"0.1.0\"")
     }
@@ -1896,9 +1927,6 @@ fun updateVersionCatalog(
     }
     if (!hasPluginVariable(pluginsSection, "jetbrains-compose-compiler")) {
         newPlugins.add("jetbrains-compose-compiler = { id = \"org.jetbrains.kotlin.plugin.compose\", version.ref = \"kotlin\" }")
-    }
-    if (!hasPluginVariable(pluginsSection, "jetbrains-compose-hotreload")) {
-        newPlugins.add("jetbrains-compose-hotreload = { id = \"org.jetbrains.compose.hot-reload\", version.ref = \"composeHotReload\" }")
     }
     if (targets.contains("android") && !hasPluginVariable(pluginsSection, "android-application")) {
         newPlugins.add("android-application = { id = \"com.android.application\", version.ref = \"agp\" }")
