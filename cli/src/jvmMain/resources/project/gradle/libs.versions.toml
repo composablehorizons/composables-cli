@@ -10,6 +10,7 @@ kotlin = "2.4.0"
 {{android_versions}}
 [libraries]
 composables-ui = { group = "com.composables", name = "ui", version.ref = "composablesUi" }
+{{compose_libraries}}
 {{android_libraries}}
 [plugins]
 {{android_plugins}}

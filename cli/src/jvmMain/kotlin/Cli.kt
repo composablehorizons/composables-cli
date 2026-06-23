@@ -619,7 +619,7 @@ class Target : CliktCommand("target") {
     private fun hasComposeDependencies(content: String): Boolean {
         val composeDependencies = listOf(
             "compose.components.resources",
-            "compose.components.uiToolingPreview",
+            "org.jetbrains.compose.ui:ui-tooling-preview",
             "libs.composables.ui",
             "com.composables:ui:",
             "compose.desktop.currentOs",
@@ -1592,6 +1592,10 @@ activityCompose = "1.13.0"
         } else {
             ""
         },
+        "{{compose_libraries}}" to """compose-ui-tooling = { group = "org.jetbrains.compose.ui", name = "ui-tooling", version.ref = "compose" }
+compose-ui-tooling-preview = { group = "org.jetbrains.compose.ui", name = "ui-tooling-preview", version.ref = "compose" }
+
+""",
         "{{android_libraries}}" to if (normalizedTargets.contains(ANDROID)) {
             """androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 
@@ -1631,11 +1635,19 @@ android.useAndroidX=true
         "{{kotlin_targets}}" to if (kotlinTargets.isNotEmpty()) kotlinTargets.joinToString("\n\n") + "\n" else "",
         "{{sourcesets}}" to """    sourceSets {
         commonMain.dependencies {
-            implementation(compose.components.uiToolingPreview)
+            implementation(libs.compose.ui.tooling.preview)
             implementation(libs.composables.ui)
         }
     }""",
-        "{{configuration_blocks}}" to "",
+        "{{configuration_blocks}}" to if (normalizedTargets.contains(ANDROID)) {
+            """
+dependencies {
+    androidRuntimeClasspath(libs.compose.ui.tooling)
+}
+            """.trimIndent()
+        } else {
+            ""
+        },
         "{{namespace}}" to packageName,
         "{{project_name}}" to projectName,
         "{{module_name}}" to moduleName,
@@ -1854,6 +1866,12 @@ fun updateVersionCatalog(
     val newLibraries = mutableListOf<String>()
     if (!hasLibraryVariable(librariesSection, "composables-ui")) {
         newLibraries.add("composables-ui = { group = \"com.composables\", name = \"ui\", version.ref = \"composablesUi\" }")
+    }
+    if (!hasLibraryVariable(librariesSection, "compose-ui-tooling")) {
+        newLibraries.add("compose-ui-tooling = { group = \"org.jetbrains.compose.ui\", name = \"ui-tooling\", version.ref = \"compose\" }")
+    }
+    if (!hasLibraryVariable(librariesSection, "compose-ui-tooling-preview")) {
+        newLibraries.add("compose-ui-tooling-preview = { group = \"org.jetbrains.compose.ui\", name = \"ui-tooling-preview\", version.ref = \"compose\" }")
     }
     if (targets.contains("android") && !hasLibraryVariable(librariesSection, "androidx-activity-compose")) {
         newLibraries.add("androidx-activity-compose = { group = \"androidx.activity\", name = \"activity-compose\", version.ref = \"activityCompose\" }")

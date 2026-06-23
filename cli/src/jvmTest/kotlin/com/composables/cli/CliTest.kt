@@ -55,6 +55,7 @@ class CliTest {
 
             assertThat(sharedBuildContent).contains("jvm()")
             assertThat(sharedBuildContent).contains("implementation(libs.composables.ui)")
+            assertThat(sharedBuildContent).contains("implementation(libs.compose.ui.tooling.preview)")
             assertThat(sharedBuildContent).doesNotContain("androidLibrary {")
             assertThat(sharedBuildContent).doesNotContain("iosArm64()")
             assertThat(sharedBuildContent).doesNotContain("wasmJs()")
@@ -72,6 +73,7 @@ class CliTest {
             assertThat(settingsContent).contains("""include(":desktopApp")""")
 
             assertThat(appContent).contains("package com.composables.demo")
+            assertThat(appContent).contains("import androidx.compose.ui.tooling.preview.Preview")
             assertThat(appContent).contains("Hello Beautiful World!")
             assertThat(appContent).contains("Go to App.kt to edit your app")
             assertThat(appContent).contains("Pro tip: Use the `dev` configuration in your IDE to auto-reload your app when you edit your code")
@@ -122,6 +124,7 @@ class CliTest {
 
             assertThat(sharedBuildContent).contains("alias(libs.plugins.android.kotlin.multiplatform.library)")
             assertThat(sharedBuildContent).contains("androidLibrary {")
+            assertThat(sharedBuildContent).contains("androidRuntimeClasspath(libs.compose.ui.tooling)")
             assertThat(sharedBuildContent).doesNotContain("alias(libs.plugins.android.application)")
             assertThat(sharedBuildContent).doesNotContain("androidMain.dependencies")
             assertThat(sharedBuildContent).doesNotContain("defaultConfig {")
