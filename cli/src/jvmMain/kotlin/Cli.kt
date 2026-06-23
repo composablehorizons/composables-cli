@@ -805,23 +805,6 @@ class Target : CliktCommand("target") {
         return -1
     }
 
-    private fun findSourceSetsBlockEnd(lines: List<String>): Int {
-        var depth = 0
-        for (i in lines.indices) {
-            val line = lines[i].trim()
-            if (line.contains("sourceSets") && line.contains("{")) {
-                depth = 1
-                for (j in i + 1 until lines.size) {
-                    val currentLine = lines[j].trim()
-                    if (currentLine.contains("{")) depth++
-                    if (currentLine.contains("}")) depth--
-                    if (depth == 0) return j
-                }
-            }
-        }
-        return -1
-    }
-
     private fun extractNamespace(lines: List<String>): String {
         // Try to find existing namespace from android block or use a default
         for (line in lines) {
@@ -1049,20 +1032,6 @@ class Target : CliktCommand("target") {
             }
         }
 
-        // Append to sourceSets block
-        val sourceSetsCloseIndex = findSourceSetsBlockEnd(lines)
-        if (sourceSetsCloseIndex >= 0) {
-            val iosMainLines = listOf(
-                "",
-                "        iosMain.dependencies {",
-                "            implementation(\"com.composables:ui:0.1.0\")",
-                "        }",
-            )
-            iosMainLines.reversed().forEach { line ->
-                lines.add(sourceSetsCloseIndex, line)
-            }
-        }
-
         // Write updated content
         buildFile.writeText(lines.joinToString("\n"))
 
@@ -1071,89 +1040,22 @@ class Target : CliktCommand("target") {
         createIosSourceSet(moduleDir, extractNamespace(lines))
 
         // Copy iOS app directory
-        copyIosAppDirectory(workingDir, moduleDir.name) // iOS app is still at root level
-
-        // Link iOS project for IDE
-        try {
-            debugln { "Preparing iOS target..." }
-            val process = ProcessBuilder(gradleScript, "compileIosMainKotlinMetadata", "--quiet")
-                .directory(File(workingDir))
-                .inheritIO()
-                .start()
-            val exitCode = process.waitFor()
-            if (exitCode == 0) {
-                echo("iOS target is now ready to run from the IDE")
-            } else {
-                echo("Warning: Failed to link iOS project for IDE. You may need to run '$gradleScript compileIosMainKotlinMetadata' manually.")
-            }
-        } catch (e: Exception) {
-            echo("Warning: Failed to link iOS project for IDE: ${e.message}")
-        }
+        copyIosAppDirectory(workingDir, moduleDir.name)
     }
 
     private fun createIosSourceSet(moduleDir: File, namespace: String) {
         val iosMainDir = File(moduleDir, "src/iosMain/kotlin")
-        val packageDir = iosMainDir
+        val packageDir = File(iosMainDir, namespace.replace(".", "/"))
 
         // Create directories
         packageDir.mkdirs()
 
-        // Create IosApp.kt
         val mainFile = File(packageDir, "MainViewController.kt")
-        val mainContent = """import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
+        val mainContent = """package $namespace
+
 import androidx.compose.ui.window.ComposeUIViewController
-import com.composables.ui.components.Text
-import com.composables.ui.theme.ComposablesTheme
-import org.jetbrains.compose.ui.tooling.preview.Preview
 
-fun MainViewController() = ComposeUIViewController { IosApp() }
-
-@Composable
-fun IosApp() {
-    ComposablesTheme {
-        Box(
-            modifier = Modifier
-                .safeDrawingPadding()
-                .fillMaxSize()
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
-            ) {
-                Text(
-                    text = "Hello Beautiful World!",
-                    textAlign = TextAlign.Center,
-                )
-                Text(
-                    text = "Go to MainViewController.kt to edit your app",
-                    textAlign = TextAlign.Center,
-                )
-                Text(
-                    text = "Pro tip: Use the `dev` configuration in your IDE to auto-reload your app when you edit your code",
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-    }
-}
-
-@Preview
-@Composable
-fun IosAppPreview() {
-    IosApp()
-}
+fun MainViewController() = ComposeUIViewController { App() }
 """
         mainFile.writeText(mainContent)
     }
@@ -1594,10 +1496,92 @@ private fun cloneGradleProjectAt(
 
             try {
                 val content = file.readText()
-                var updatedContent = content.replace("{{app_name}}", appName)
+                val updatedContent = renderProjectTemplate(
+                    content = content,
+                    packageName = packageName,
+                    moduleName = moduleName,
+                    appName = appName,
+                    targets = normalizedTargets,
+                    projectName = target.name,
+                )
+                if (content != updatedContent) {
+                    file.writeText(updatedContent)
+                }
+            } catch (e: Exception) {
+                // If we can't read as text, skip this file
+                debugln { "Skipping binary file: ${file.name}" }
+            }
+        }
+    }
+}
 
-                val androidVersions = if (normalizedTargets.contains(ANDROID)) {
-                    """# Android
+private fun renderProjectTemplate(
+    content: String,
+    packageName: String,
+    moduleName: String,
+    appName: String,
+    targets: Set<String>,
+    projectName: String = "",
+): String {
+    val normalizedTargets = normalizeTargets(targets)
+    val imports = buildList {
+        if (normalizedTargets.contains(ANDROID)) add("import org.jetbrains.kotlin.gradle.dsl.JvmTarget")
+        if (normalizedTargets.contains(WASM)) add("import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl")
+    }
+    val plugins = buildList {
+        add("    alias(libs.plugins.jetbrains.kotlin.multiplatform)")
+        add("    alias(libs.plugins.jetbrains.compose)")
+        if (!content.contains("libs.plugins.kotlin.compose")) {
+            add("    alias(libs.plugins.jetbrains.compose.compiler)")
+        }
+        if (normalizedTargets.contains(ANDROID)) {
+            add("    alias(libs.plugins.android.kotlin.multiplatform.library)")
+        }
+    }
+    val kotlinTargets = buildList {
+        if (normalizedTargets.contains(ANDROID)) {
+            add(
+                """    androidLibrary {
+        namespace = "{{namespace}}.shared"
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
+        withJava()
+        androidResources {
+            enable = true
+        }
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
+    }""",
+            )
+        }
+        if (normalizedTargets.contains(IOS)) {
+            add(
+                """    listOf(
+        iosArm64(),
+        iosSimulatorArm64()
+    ).forEach { iosTarget ->
+        iosTarget.binaries.framework {
+            baseName = "${toCamelCase(moduleName)}"
+            isStatic = true
+        }
+    }""",
+            )
+        }
+        if (normalizedTargets.contains(JVM)) add("    jvm()")
+        if (normalizedTargets.contains(WASM)) {
+            add(
+                """    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        browser()
+    }""",
+            )
+        }
+    }
+
+    val replacements = linkedMapOf(
+        "{{android_versions}}" to if (normalizedTargets.contains(ANDROID)) {
+            """# Android
 agp = "9.2.1"
 android-compileSdk = "37"
 android-minSdk = "23"
@@ -1605,52 +1589,69 @@ android-targetSdk = "37"
 activityCompose = "1.13.0"
 
 """
-                } else {
-                    ""
-                }
-
-                val androidLibraries =
-                    if (normalizedTargets.contains(ANDROID)) {
-                        """androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+        } else {
+            ""
+        },
+        "{{android_libraries}}" to if (normalizedTargets.contains(ANDROID)) {
+            """androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 
 """
-                    } else {
-                        ""
-                    }
-
-                val androidPlugins =
-                    if (normalizedTargets.contains(ANDROID)) {
-                        """
+        } else {
+            ""
+        },
+        "{{android_plugins}}" to if (normalizedTargets.contains(ANDROID)) {
+            """
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
-                        """.trimIndent()
-                    } else {
-                        ""
-                    }
-
-                val androidProperties = if (normalizedTargets.contains(ANDROID)) {
-                    """#Android
+            """.trimIndent()
+        } else {
+            ""
+        },
+        "{{android_root_plugins}}" to if (normalizedTargets.contains(ANDROID)) {
+            """    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.android.kotlin.multiplatform.library) apply false
+"""
+        } else {
+            ""
+        },
+        "{{android_include}}" to if (normalizedTargets.contains(ANDROID)) """include(":$ANDROID_APP_MODULE")""" else "",
+        "{{desktop_include}}" to if (normalizedTargets.contains(JVM)) """include(":$DESKTOP_APP_MODULE")""" else "",
+        "{{web_include}}" to if (normalizedTargets.contains(WASM)) """include(":$WEB_APP_MODULE")""" else "",
+        "{{android_properties}}" to if (normalizedTargets.contains(ANDROID)) {
+            """#Android
 android.nonTransitiveRClass=true
 android.useAndroidX=true
 """
-                } else {
-                    ""
-                }
+        } else {
+            ""
+        },
+        "{{web_preload_task_wiring}}" to if (normalizedTargets.contains(WASM)) wasmPreloadTaskWiring() else "",
+        "{{imports}}" to if (imports.isNotEmpty()) imports.joinToString("\n") + "\n" else "",
+        "{{plugins}}" to "plugins {\n" + plugins.joinToString("\n") + "\n}",
+        "{{kotlin_targets}}" to if (kotlinTargets.isNotEmpty()) kotlinTargets.joinToString("\n\n") + "\n" else "",
+        "{{sourcesets}}" to """    sourceSets {
+        commonMain.dependencies {
+            implementation(compose.components.uiToolingPreview)
+            implementation(libs.composables.ui)
+        }
+    }""",
+        "{{configuration_blocks}}" to "",
+        "{{namespace}}" to packageName,
+        "{{project_name}}" to projectName,
+        "{{module_name}}" to moduleName,
+        "{{shared_module_name}}" to moduleName,
+        "{{app_name}}" to appName,
+        "{{shared_module_accessor}}" to toProjectAccessorName(moduleName),
+        "{{ios_binary_name}}" to toCamelCase(moduleName),
+        "{{target_name}}" to "$IOS_APP_MODULE.app",
+    )
 
-                val androidRootPlugins = if (normalizedTargets.contains(ANDROID)) {
-                    """    alias(libs.plugins.android.application) apply false
-    alias(libs.plugins.android.kotlin.multiplatform.library) apply false
-"""
-                } else {
-                    ""
-                }
+    return replacements.entries.fold(content) { updated, (placeholder, value) ->
+        updated.replace(placeholder, value)
+    }.trim() + "\n"
+}
 
-                val androidInclude = if (normalizedTargets.contains(ANDROID)) """include(":$ANDROID_APP_MODULE")""" else ""
-                val desktopInclude = if (normalizedTargets.contains(JVM)) """include(":$DESKTOP_APP_MODULE")""" else ""
-                val webInclude = if (normalizedTargets.contains(WASM)) """include(":$WEB_APP_MODULE")""" else ""
-
-                val webPreloadTaskWiring = if (normalizedTargets.contains(WASM)) {
-                    """
+private fun wasmPreloadTaskWiring(): String = """
 subprojects {
     fun registerPreloadInjectionTask(
         distributionTarget: String,
@@ -1711,151 +1712,7 @@ subprojects {
         finalizedBy(injectWasmPreloads)
     }
 }
-                    """.trimIndent()
-                } else {
-                    ""
-                }
-
-                // Build imports block
-                val imports = mutableListOf<String>()
-                if (normalizedTargets.contains(ANDROID)) {
-                    imports.add("import org.jetbrains.kotlin.gradle.dsl.JvmTarget")
-                }
-                if (normalizedTargets.contains(WASM)) {
-                    imports.add("import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl")
-                }
-                val importsBlock = if (imports.isNotEmpty()) imports.joinToString("\n") + "\n" else ""
-
-                // Build plugins block
-                val plugins = mutableListOf<String>()
-                plugins.add("    alias(libs.plugins.jetbrains.kotlin.multiplatform)")
-                plugins.add("    alias(libs.plugins.jetbrains.compose)")
-                // Only add compose compiler if kotlin compose plugin is not already present
-                if (!content.contains("libs.plugins.kotlin.compose")) {
-                    plugins.add("    alias(libs.plugins.jetbrains.compose.compiler)")
-                }
-                if (normalizedTargets.contains(ANDROID)) {
-                    plugins.add("    alias(libs.plugins.android.kotlin.multiplatform.library)")
-                }
-                val pluginsBlock = "plugins {\n" + plugins.joinToString("\n") + "\n}"
-
-                // Build kotlin targets block
-                val kotlinTargets = mutableListOf<String>()
-                if (normalizedTargets.contains(ANDROID)) {
-                    kotlinTargets.add(
-                        """    androidLibrary {
-        namespace = "{{namespace}}.shared"
-        compileSdk = libs.versions.android.compileSdk.get().toInt()
-        minSdk = libs.versions.android.minSdk.get().toInt()
-        withJava()
-        androidResources {
-            enable = true
-        }
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_17)
-        }
-    }""",
-                    )
-                }
-                if (normalizedTargets.contains(IOS)) {
-                    val baseName = toCamelCase(moduleName)
-                    kotlinTargets.add(
-                        """    listOf(
-        iosArm64(),
-        iosSimulatorArm64()
-    ).forEach { iosTarget ->
-        iosTarget.binaries.framework {
-            baseName = "$baseName"
-            isStatic = true
-        }
-    }""",
-                    )
-                }
-                if (normalizedTargets.contains(JVM)) {
-                    kotlinTargets.add("    jvm()")
-                }
-                if (normalizedTargets.contains(WASM)) {
-                    kotlinTargets.add(
-                        """    @OptIn(ExperimentalWasmDsl::class)
-    wasmJs {
-        browser()
-    }""",
-                    )
-                }
-                val kotlinTargetsBlock =
-                    if (kotlinTargets.isNotEmpty()) kotlinTargets.joinToString("\n\n") + "\n" else ""
-
-                // Build sourcesets block
-                val sourcesets = mutableListOf<String>()
-                sourcesets.add(
-                    """    sourceSets {
-        commonMain.dependencies {
-            implementation(compose.components.uiToolingPreview)
-            implementation(libs.composables.ui)
-        }""",
-                )
-
-                sourcesets.add("    }")
-                val sourcesetsBlock = sourcesets.joinToString("\n")
-
-                // Build configuration blocks
-                val configurationBlocksBlock = ""
-
-                updatedContent = updatedContent.replace("{{android_versions}}", androidVersions)
-                updatedContent = updatedContent.replace("{{android_libraries}}", androidLibraries)
-                updatedContent = updatedContent.replace("{{android_plugins}}", androidPlugins)
-                updatedContent = updatedContent.replace("{{android_root_plugins}}", androidRootPlugins)
-                updatedContent = updatedContent.replace("{{android_include}}", androidInclude)
-                updatedContent = updatedContent.replace("{{desktop_include}}", desktopInclude)
-                updatedContent = updatedContent.replace("{{web_include}}", webInclude)
-                updatedContent = updatedContent.replace("{{android_properties}}", androidProperties)
-                updatedContent = updatedContent.replace("{{web_preload_task_wiring}}", webPreloadTaskWiring)
-
-                // Replace shared build.gradle.kts blocks
-                updatedContent = updatedContent.replace("{{imports}}", importsBlock)
-                updatedContent = updatedContent.replace("{{plugins}}", pluginsBlock)
-                updatedContent = updatedContent.replace("{{kotlin_targets}}", kotlinTargetsBlock)
-                updatedContent = updatedContent.replace("{{sourcesets}}", sourcesetsBlock)
-                updatedContent = updatedContent.replace("{{configuration_blocks}}", configurationBlocksBlock)
-
-                // Replace remaining placeholders after blocks are built
-                updatedContent = updatedContent.replace("{{namespace}}", packageName)
-                updatedContent = updatedContent.replace("{{project_name}}", target.name)
-                updatedContent = updatedContent.replace("{{module_name}}", moduleName)
-                updatedContent = updatedContent.replace("{{shared_module_name}}", moduleName)
-                updatedContent = updatedContent.replace("{{app_name}}", appName)
-                updatedContent = updatedContent.replace("{{shared_module_accessor}}", toProjectAccessorName(moduleName))
-                updatedContent = updatedContent.replace("{{ios_binary_name}}", toCamelCase(moduleName))
-                updatedContent = updatedContent.replace("{{target_name}}", "$IOS_APP_MODULE.app")
-                if (content != updatedContent) {
-                    file.writeText(updatedContent.trim() + "\n")
-                }
-            } catch (e: Exception) {
-                // If we can't read as text, skip this file
-                debugln { "Skipping binary file: ${file.name}" }
-            }
-        }
-    }
-
-    // Link iOS project for IDE if iOS target was included
-    if (normalizedTargets.contains(IOS)) {
-        try {
-            debugln { "Preparing iOS target..." }
-            val process = ProcessBuilder(gradleScript, "compileIosMainKotlinMetadata", "--quiet")
-                .directory(target)
-                .inheritIO()
-                .start()
-            val exitCode = process.waitFor()
-            if (exitCode == 0) {
-                debugln { "iOS target is now ready to run from the IDE" }
-            } else {
-                warnln { "Warning: Failed to link iOS project for IDE. You may need to run '$gradleScript compileIosMainKotlinMetadata' manually." }
-            }
-        } catch (e: Exception) {
-            warnln { "Warning: Failed to link iOS project for IDE: ${e.message}" }
-        }
-    }
-}
+""".trimIndent()
 
 fun updateRootBuildFile(
     targetDir: String,
@@ -1947,70 +1804,7 @@ fun updateRootBuildFile(
     }
 
     if (normalizedTargets.contains(WASM) && !content.contains("injectWasmPreloads")) {
-        buildFile.writeText(
-            buildFile.readText().trimEnd() + "\n\n" + """
-subprojects {
-    fun registerPreloadInjectionTask(
-        distributionTarget: String,
-        markerName: String,
-        includeWasmArtifacts: Boolean,
-    ) = tasks.register("inject${'$'}{distributionTarget.replaceFirstChar(Char::titlecase)}Preloads") {
-        description = "Injects preload links for generated ${'$'}distributionTarget distribution artifacts."
-        val distributionDir = layout.buildDirectory.dir("dist/${'$'}distributionTarget/productionExecutable")
-        val preloadMarker = markerName
-        val preloadWasmArtifacts = includeWasmArtifacts
-
-        doLast {
-            val distDir = distributionDir.get().asFile
-            val indexFile = distDir.resolve("index.html")
-            if (!indexFile.isFile) return@doLast
-
-            val scriptPreloads = distDir
-                .listFiles { file -> file.isFile && file.extension == "js" }
-                .orEmpty()
-                .sortedBy { it.name }
-                .map { "  <link rel=\"preload\" href=\"${'$'}{it.name}\" as=\"script\">" }
-
-            val artifactPreloads = if (preloadWasmArtifacts) {
-                distDir
-                    .listFiles { file -> file.isFile && file.extension == "wasm" }
-                    .orEmpty()
-                    .sortedBy { it.name }
-                    .map {
-                        "  <link rel=\"preload\" href=\"${'$'}{it.name}\" as=\"fetch\" type=\"application/wasm\" crossorigin>"
-                    }
-            } else {
-                emptyList()
-            }
-
-            val preloadBlock = (scriptPreloads + artifactPreloads).joinToString(
-                separator = "\n",
-                prefix = "  <!-- ${'$'}preloadMarker:start -->\n",
-                postfix = "\n  <!-- ${'$'}preloadMarker:end -->",
-            )
-
-            val existingPreloadBlock = Regex(
-                pattern = "\\n?  <!-- ${'$'}preloadMarker:start -->.*?  <!-- ${'$'}preloadMarker:end -->\\n?",
-                options = setOf(RegexOption.DOT_MATCHES_ALL),
-            )
-            val indexHtml = indexFile.readText().replace(existingPreloadBlock, "\n")
-            val updatedIndexHtml = indexHtml.replaceFirst("</title>", "</title>\n${'$'}preloadBlock")
-            indexFile.writeText(updatedIndexHtml)
-        }
-    }
-
-    val injectWasmPreloads = registerPreloadInjectionTask(
-        distributionTarget = "wasmJs",
-        markerName = "wasm-preloads",
-        includeWasmArtifacts = true,
-    )
-
-    tasks.matching { it.name == "wasmJsBrowserDistribution" }.configureEach {
-        finalizedBy(injectWasmPreloads)
-    }
-}
-            """.trimIndent() + "\n",
-        )
+        buildFile.writeText(buildFile.readText().trimEnd() + "\n\n" + wasmPreloadTaskWiring() + "\n")
     }
 }
 
@@ -2295,109 +2089,15 @@ fun createModuleOnly(
 
             try {
                 val content = file.readText()
-                var updatedContent = content.replace("{{app_name}}", appName)
-
-                // Build imports block
-                val imports = mutableListOf<String>()
-                if (normalizedTargets.contains(WASM)) {
-                    imports.add("import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl")
-                }
-                if (normalizedTargets.contains(ANDROID)) {
-                    imports.add("import org.jetbrains.kotlin.gradle.dsl.JvmTarget")
-                }
-                val importsBlock = if (imports.isNotEmpty()) imports.joinToString("\n") + "\n" else ""
-
-                // Build plugins block
-                val plugins = mutableListOf<String>()
-                plugins.add("    alias(libs.plugins.jetbrains.kotlin.multiplatform)")
-                plugins.add("    alias(libs.plugins.jetbrains.compose)")
-                // Only add compose compiler if kotlin compose plugin is not already present
-                if (!content.contains("libs.plugins.kotlin.compose")) {
-                    plugins.add("    alias(libs.plugins.jetbrains.compose.compiler)")
-                }
-                if (normalizedTargets.contains(ANDROID)) {
-                    plugins.add("    alias(libs.plugins.android.kotlin.multiplatform.library)")
-                }
-                val pluginsBlock = "plugins {\n" + plugins.joinToString("\n") + "\n}"
-
-                // Build kotlin targets block
-                val kotlinTargets = mutableListOf<String>()
-                if (normalizedTargets.contains(ANDROID)) {
-                    kotlinTargets.add(
-                        """    androidLibrary {
-        namespace = "{{namespace}}.shared"
-        compileSdk = libs.versions.android.compileSdk.get().toInt()
-        minSdk = libs.versions.android.minSdk.get().toInt()
-        withJava()
-        androidResources {
-            enable = true
-        }
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_17)
-        }
-    }""",
-                    )
-                }
-                if (normalizedTargets.contains(IOS)) {
-                    val baseName = toCamelCase(moduleName)
-                    kotlinTargets.add(
-                        """    listOf(
-        iosArm64(),
-        iosSimulatorArm64()
-    ).forEach { iosTarget ->
-        iosTarget.binaries.framework {
-            baseName = "$baseName"
-            isStatic = true
-        }
-    }""",
-                    )
-                }
-                if (normalizedTargets.contains(JVM)) {
-                    kotlinTargets.add("    jvm()")
-                }
-                if (normalizedTargets.contains(WASM)) {
-                    kotlinTargets.add(
-                        """    @OptIn(ExperimentalWasmDsl::class)
-    wasmJs {
-        browser()
-    }""",
-                    )
-                }
-                val kotlinTargetsBlock =
-                    if (kotlinTargets.isNotEmpty()) kotlinTargets.joinToString("\n\n") + "\n" else ""
-
-                // Build sourcesets block
-                val sourcesets = mutableListOf<String>()
-                sourcesets.add(
-                    """    sourceSets {
-        commonMain.dependencies {
-            implementation(compose.components.uiToolingPreview)
-            implementation(libs.composables.ui)
-        }""",
+                val updatedContent = renderProjectTemplate(
+                    content = content,
+                    packageName = packageName,
+                    moduleName = moduleName,
+                    appName = appName,
+                    targets = normalizedTargets,
                 )
-
-                sourcesets.add("    }")
-                val sourcesetsBlock = sourcesets.joinToString("\n")
-
-                // Build configuration blocks
-                val configurationBlocksBlock = ""
-
-                // Replace shared build.gradle.kts blocks
-                updatedContent = updatedContent.replace("{{imports}}", importsBlock)
-                updatedContent = updatedContent.replace("{{plugins}}", pluginsBlock)
-                updatedContent = updatedContent.replace("{{kotlin_targets}}", kotlinTargetsBlock)
-                updatedContent = updatedContent.replace("{{sourcesets}}", sourcesetsBlock)
-                updatedContent = updatedContent.replace("{{configuration_blocks}}", configurationBlocksBlock)
-
-                // Replace remaining placeholders after blocks are built
-                updatedContent = updatedContent.replace("{{namespace}}", packageName)
-                updatedContent = updatedContent.replace("{{module_name}}", moduleName)
-                updatedContent = updatedContent.replace("{{app_name}}", appName)
-                updatedContent = updatedContent.replace("{{shared_module_accessor}}", toProjectAccessorName(moduleName))
-                updatedContent = updatedContent.replace("{{ios_binary_name}}", toCamelCase(moduleName))
-                updatedContent = updatedContent.replace("{{target_name}}", "$IOS_APP_MODULE.app")
                 if (content != updatedContent) {
-                    file.writeText(updatedContent.trim() + "\n")
+                    file.writeText(updatedContent)
                 }
             } catch (e: Exception) {
                 // If we can't read as text, skip this file
