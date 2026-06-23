@@ -47,7 +47,7 @@ class CliIntegrationTest {
             assertThat(initResult.output).contains("Success! Your new Compose app is ready")
 
             val compileResult = runProcess(
-                command = listOf(projectGradleScript(), ":composeApp:compileKotlinJvm"),
+                command = listOf(projectGradleScript(), ":shared:compileKotlinJvm"),
                 workingDir = projectDir,
                 timeoutSeconds = 180,
             )
@@ -88,7 +88,7 @@ class CliIntegrationTest {
             assertThat(createResult.output).contains("Success! Your new Compose app is ready")
 
             val compileResult = runProcess(
-                command = listOf(projectGradleScript(), ":composeApp:compileKotlinJvm"),
+                command = listOf(projectGradleScript(), ":shared:compileKotlinJvm"),
                 workingDir = projectDir,
                 timeoutSeconds = 180,
             )
@@ -120,7 +120,7 @@ class CliIntegrationTest {
             assertThat(createResult.output).contains("Success! Your new Compose app is ready")
 
             val compileResult = runProcess(
-                command = listOf(projectGradleScript(), ":composeApp:compileKotlinJvm"),
+                command = listOf(projectGradleScript(), ":shared:compileKotlinJvm"),
                 workingDir = projectDir,
                 timeoutSeconds = 180,
             )
