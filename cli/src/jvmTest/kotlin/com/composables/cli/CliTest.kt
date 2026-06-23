@@ -40,7 +40,7 @@ class CliTest {
 
             assertThat(File(projectDir, "iosDesktopApp").exists(), "iOS app scaffold should be skipped for JVM-only template runs").isFalse()
             assertThat(File(projectDir, "desktopApp/src/androidMain").exists(), "Android sources should be omitted for JVM-only template runs").isFalse()
-            assertThat(File(projectDir, "desktopApp/src/webMain").exists(), "Web sources should be omitted for JVM-only template runs").isFalse()
+            assertThat(File(projectDir, "desktopApp/src/wasmJsMain").exists(), "Wasm sources should be omitted for JVM-only template runs").isFalse()
 
             val buildContent = buildFile.readText()
             val rootBuildContent = rootBuildFile.readText()
@@ -59,7 +59,6 @@ class CliTest {
             assertThat(rootBuildContent).doesNotContain("composeCompatibilityBrowserDistribution")
             assertThat(rootBuildContent).doesNotContain("jsBrowserDistribution")
             assertThat(rootBuildContent).doesNotContain("wasmJsBrowserDistribution")
-            assertThat(rootBuildContent).doesNotContain("compose-web-compatibility-preloads")
             assertThat(rootBuildContent).doesNotContain("js-preloads")
             assertThat(rootBuildContent).doesNotContain("wasm-preloads")
             assertThat(settingsContent).contains("""rootProject.name = "newApp"""")
@@ -123,7 +122,6 @@ class CliTest {
             assertThat(rootBuildContent).contains("wasm-preloads")
             assertThat(rootBuildContent).doesNotContain("composeCompatibilityBrowserDistribution")
             assertThat(rootBuildContent).doesNotContain("jsBrowserDistribution")
-            assertThat(rootBuildContent).doesNotContain("compose-web-compatibility-preloads")
             assertThat(rootBuildContent).doesNotContain("js-preloads")
             assertThat(moduleBuildContent).doesNotContain("js {")
             assertThat(moduleBuildContent).contains("wasmJs {")

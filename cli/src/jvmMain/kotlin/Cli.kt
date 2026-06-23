@@ -1435,86 +1435,13 @@ fun IosAppPreview() {
         // Write updated content
         buildFile.writeText(lines.joinToString("\n"))
 
-        // Create browser source sets
         val moduleDir = buildFile.parentFile
-        createWebSourceSets(moduleDir, extractNamespace(lines))
 
         // Copy webpack.config.d directory
         copyWebpackConfigDirectory(moduleDir)
 
         // Copy resources directory
-        copyResourcesDirectory(moduleDir)
-    }
-
-    private fun createWebSourceSets(moduleDir: File, namespace: String) {
-        // Create webMain source set
-        val webMainDir = File(moduleDir, "src/webMain/kotlin")
-        val webPackageDir = webMainDir
-        webPackageDir.mkdirs()
-
-        val webMainFile = File(webPackageDir, "main.web.kt")
-        val webMainContent = """import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.window.ComposeViewport
-import com.composables.ui.components.Text
-import com.composables.ui.theme.ComposablesTheme
-import org.jetbrains.compose.ui.tooling.preview.Preview
-
-@OptIn(ExperimentalComposeUiApi::class)
-fun main() {
-    ComposeViewport {
-        WebApp()
-    }
-}
-
-@Composable
-fun WebApp() {
-    ComposablesTheme {
-        Box(
-            modifier = Modifier
-                .safeDrawingPadding()
-                .fillMaxSize()
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
-            ) {
-                Text(
-                    text = "Hello Beautiful World!",
-                    textAlign = TextAlign.Center,
-                )
-                Text(
-                    text = "Go to main.web.kt to edit your app",
-                    textAlign = TextAlign.Center,
-                )
-                Text(
-                    text = "Pro tip: Use the `dev` configuration in your IDE to auto-reload your app when you edit your code",
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-    }
-}
-
-@Preview
-@Composable
-fun WebAppPreview() {
-    WebApp()
-}
-"""
-        webMainFile.writeText(webMainContent)
+        copyWasmResourcesDirectory(moduleDir)
     }
 
     private fun copyWebpackConfigDirectory(moduleDir: File) {
@@ -1575,8 +1502,8 @@ fun WebAppPreview() {
         }
     }
 
-    private fun copyResourcesDirectory(moduleDir: File) {
-        val targetDir = File(moduleDir, "src/webMain/resources")
+    private fun copyWasmResourcesDirectory(moduleDir: File) {
+        val targetDir = File(moduleDir, "src/wasmJsMain/resources")
 
         fun copyResource(resourcePath: String, targetFile: File) {
             val inputStream: InputStream? = object {}.javaClass.getResourceAsStream(resourcePath)
@@ -1625,9 +1552,9 @@ fun WebAppPreview() {
             return resources
         }
 
-        val resources = listResources("/project/composeApp/src/webMain/resources")
+        val resources = listResources("/project/composeApp/src/wasmJsMain/resources")
         resources.forEach { resourcePath ->
-            val targetPath = resourcePath.removePrefix("/project/composeApp/src/webMain/resources/")
+            val targetPath = resourcePath.removePrefix("/project/composeApp/src/wasmJsMain/resources/")
             val targetFile = targetDir.resolve(targetPath)
             copyResource(resourcePath, targetFile)
 
@@ -1883,9 +1810,7 @@ private fun cloneGradleProjectAt(
                 "androidMain" -> if (!normalizedTargets.contains(ANDROID)) return@forEach
                 "iosMain" -> if (!normalizedTargets.contains(IOS)) return@forEach
                 "jvmMain" -> if (!normalizedTargets.contains(JVM)) return@forEach
-                "jsMain" -> return@forEach
                 "wasmJsMain" -> if (!normalizedTargets.contains(WASM)) return@forEach
-                "webMain" -> if (!normalizedTargets.contains(WASM)) return@forEach
                 "commonMain" -> Unit
                 else -> error("Unknown target: $targetPath")
             }
@@ -2640,9 +2565,7 @@ fun createModuleOnly(
                 "androidMain" -> if (!normalizedTargets.contains(ANDROID)) return@forEach
                 "iosMain" -> if (!normalizedTargets.contains(IOS)) return@forEach
                 "jvmMain" -> if (!normalizedTargets.contains(JVM)) return@forEach
-                "jsMain" -> return@forEach
                 "wasmJsMain" -> if (!normalizedTargets.contains(WASM)) return@forEach
-                "webMain" -> if (!normalizedTargets.contains(WASM)) return@forEach
                 "commonMain" -> Unit
                 else -> error("Unknown target: $targetPath")
             }
