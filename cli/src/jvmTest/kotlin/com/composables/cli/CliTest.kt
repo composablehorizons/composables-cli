@@ -270,6 +270,54 @@ class CliTest {
     }
 
     @Test
+    fun `target command detects current android target shape`() {
+        withTempDir { targetDir ->
+            val buildFile = File(targetDir, "build.gradle.kts").apply {
+                writeText(
+                    """
+                    kotlin {
+                        android {
+                            namespace = "com.example.shared"
+                        }
+                    }
+                    """.trimIndent(),
+                )
+            }
+
+            assertThat(hasAndroidTarget(buildFile)).isTrue()
+        }
+    }
+
+    @Test
+    fun `target command ignores legacy android target shapes`() {
+        withTempDir { targetDir ->
+            val androidTargetFile = File(targetDir, "android-target.gradle.kts").apply {
+                writeText(
+                    """
+                    kotlin {
+                        androidTarget()
+                    }
+                    """.trimIndent(),
+                )
+            }
+            val androidLibraryFile = File(targetDir, "android-library.gradle.kts").apply {
+                writeText(
+                    """
+                    kotlin {
+                        androidLibrary {
+                            namespace = "com.example.shared"
+                        }
+                    }
+                    """.trimIndent(),
+                )
+            }
+
+            assertThat(hasAndroidTarget(androidTargetFile)).isFalse()
+            assertThat(hasAndroidTarget(androidLibraryFile)).isFalse()
+        }
+    }
+
+    @Test
     fun `gradleScript uses batch file on windows`() {
         withOsName("Windows 11") {
             assertThat(gradleScript).isEqualTo("gradlew.bat")
@@ -300,6 +348,12 @@ class CliTest {
         } finally {
             System.setProperty("os.name", original)
         }
+    }
+
+    private fun hasAndroidTarget(buildFile: File): Boolean {
+        val method = Target::class.java.getDeclaredMethod("hasAndroidTarget", File::class.java)
+        method.isAccessible = true
+        return method.invoke(Target(), buildFile) as Boolean
     }
 
     private fun String.countOccurrences(value: String): Int = split(value).size - 1

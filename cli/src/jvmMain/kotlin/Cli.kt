@@ -715,7 +715,7 @@ class Target : CliktCommand("target") {
 
     private fun hasAndroidTarget(buildFile: File): Boolean {
         val content = buildFile.readText()
-        return content.contains("androidLibrary {") || content.contains("androidTarget {") || content.contains("android {")
+        return content.contains("android {")
     }
 
     private fun hasJvmTarget(buildFile: File): Boolean {
