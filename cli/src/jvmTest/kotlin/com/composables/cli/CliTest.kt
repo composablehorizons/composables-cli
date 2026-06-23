@@ -126,6 +126,7 @@ class CliTest {
             assertThat(sharedBuildContent).contains("alias(libs.plugins.android.kotlin.multiplatform.library)")
             assertThat(sharedBuildContent).contains("android {")
             assertThat(sharedBuildContent).doesNotContain("androidLibrary {")
+            assertThat(sharedBuildContent).contains("""namespace = "com.composables.demo.sharedUi"""")
             assertThat(sharedBuildContent).contains("androidRuntimeClasspath(libs.compose.ui.tooling)")
             assertThat(sharedBuildContent).doesNotContain("alias(libs.plugins.android.application)")
             assertThat(sharedBuildContent).doesNotContain("androidMain.dependencies")

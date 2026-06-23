@@ -504,6 +504,8 @@ private fun toCamelCase(input: String): String = input.split(Regex("[-_]"))
 private fun toProjectAccessorName(input: String): String = toCamelCase(input)
     .replaceFirstChar { if (it.isUpperCase()) it.lowercase() else it.toString() }
 
+private fun toNamespaceSegment(input: String): String = toProjectAccessorName(input)
+
 class Target : CliktCommand("target") {
     override fun help(context: Context): String = """
         Adds a new Kotlin target to the current Compose Multiplatform project (options: android, jvm, ios, wasm).
@@ -732,10 +734,11 @@ class Target : CliktCommand("target") {
         // Append to kotlin block
         val kotlinCloseIndex = findKotlinBlockEnd(lines)
         if (kotlinCloseIndex >= 0) {
+            val moduleNamespace = toNamespaceSegment(moduleName)
             val androidTargetLines = listOf(
                 "",
                 "    android {",
-                "        namespace = \"$namespace.shared\"",
+                "        namespace = \"$namespace.$moduleNamespace\"",
                 "        compileSdk = libs.versions.android.compileSdk.get().toInt()",
                 "        minSdk = libs.versions.android.minSdk.get().toInt()",
                 "        withJava()",
@@ -1525,6 +1528,7 @@ private fun renderProjectTemplate(
     projectName: String = "",
 ): String {
     val normalizedTargets = normalizeTargets(targets)
+    val sharedModuleNamespace = toNamespaceSegment(moduleName)
     val imports = buildList {
         if (normalizedTargets.contains(ANDROID)) add("import org.jetbrains.kotlin.gradle.dsl.JvmTarget")
         if (normalizedTargets.contains(WASM)) add("import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl")
@@ -1543,7 +1547,7 @@ private fun renderProjectTemplate(
         if (normalizedTargets.contains(ANDROID)) {
             add(
                 """    android {
-        namespace = "{{namespace}}.shared"
+        namespace = "{{namespace}}.$sharedModuleNamespace"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
         withJava()
