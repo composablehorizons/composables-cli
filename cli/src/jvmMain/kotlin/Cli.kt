@@ -886,7 +886,7 @@ class Target : CliktCommand("target") {
                 "[versions]",
                 """[versions]
 # Android
-agp = "9.0.0"
+agp = "8.8.2"
 android-compileSdk = "37"
 android-minSdk = "23"
 android-targetSdk = "37"
@@ -1858,7 +1858,7 @@ private fun cloneGradleProjectAt(
 
                 val androidVersions = if (normalizedTargets.contains(ANDROID)) {
                     """# Android
-agp = "9.0.0"
+agp = "8.8.2"
 android-compileSdk = "37"
 android-minSdk = "23"
 android-targetSdk = "37"
@@ -2353,7 +2353,7 @@ fun updateVersionCatalog(
 
     // Add Android versions if android target is selected
     if (targets.contains("android")) {
-        if (!hasVersionVariable(versionsSection, "agp")) newVersions.add("agp = \"9.0.0\"")
+        if (!hasVersionVariable(versionsSection, "agp")) newVersions.add("agp = \"8.8.2\"")
         if (!hasVersionVariable(versionsSection, "android-compileSdk")) newVersions.add("android-compileSdk = \"37\"")
         if (!hasVersionVariable(versionsSection, "android-minSdk")) newVersions.add("android-minSdk = \"23\"")
         if (!hasVersionVariable(versionsSection, "android-targetSdk")) newVersions.add("android-targetSdk = \"37\"")
