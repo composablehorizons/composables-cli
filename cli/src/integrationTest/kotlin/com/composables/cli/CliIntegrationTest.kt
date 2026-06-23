@@ -45,6 +45,7 @@ class CliIntegrationTest {
             assertThat(initResult.finished).isTrue()
             assertThat(initResult.exitCode).isEqualTo(0)
             assertThat(initResult.output).contains("Success! Your new Compose app is ready")
+            assertThat(initResult.output).contains("${projectGradleScript()} :desktopApp:hotRunJvm --auto")
             assertJvmReadme(projectDir)
 
             val compileResult = runProcess(
@@ -87,6 +88,7 @@ class CliIntegrationTest {
             assertThat(createResult.finished).isTrue()
             assertThat(createResult.exitCode).isEqualTo(0)
             assertThat(createResult.output).contains("Success! Your new Compose app is ready")
+            assertThat(createResult.output).contains("${projectGradleScript()} :desktopApp:hotRunJvm --auto")
             assertJvmReadme(projectDir)
 
             val compileResult = runProcess(
@@ -120,6 +122,7 @@ class CliIntegrationTest {
             assertThat(createResult.finished).isTrue()
             assertThat(createResult.exitCode).isEqualTo(0)
             assertThat(createResult.output).contains("Success! Your new Compose app is ready")
+            assertThat(createResult.output).contains("${projectGradleScript()} :desktopApp:hotRunJvm --auto")
             assertJvmReadme(projectDir)
 
             val compileResult = runProcess(
