@@ -33,6 +33,37 @@ private fun normalizeTargets(targets: Set<String>): LinkedHashSet<String> = link
     addAll(targets)
 }
 
+private fun buildProjectReadme(
+    projectName: String,
+    targets: Set<String>,
+): String {
+    val normalizedTargets = normalizeTargets(targets)
+    val lines = mutableListOf<String>()
+
+    lines += "# $projectName"
+    lines += ""
+    lines += "## Run"
+    lines += ""
+    lines += "From the project root:"
+    lines += ""
+
+    if (normalizedTargets.contains(JVM)) {
+        lines += "- JVM: `./gradlew :$DESKTOP_APP_MODULE:run`"
+    }
+    if (normalizedTargets.contains(ANDROID)) {
+        lines += "- Android: open the project in Android Studio and run the `$ANDROID_APP_MODULE` app on a device or emulator"
+        lines += "- Android install from terminal: `./gradlew :$ANDROID_APP_MODULE:installDebug`"
+    }
+    if (normalizedTargets.contains(IOS)) {
+        lines += "- iOS: open `$IOS_APP_MODULE/$IOS_APP_MODULE.xcodeproj` in Xcode and run the app on a simulator or device"
+    }
+    if (normalizedTargets.contains(WASM)) {
+        lines += "- Wasm: `./gradlew :$WEB_APP_MODULE:wasmJsBrowserDevelopmentRun`"
+    }
+
+    return lines.joinToString("\n") + "\n"
+}
+
 suspend fun main(args: Array<String>) {
     ComposablesCli()
         .subcommands(CreateApp(), Init(), Target())
@@ -1517,6 +1548,13 @@ private fun cloneGradleProjectAt(
             }
         }
     }
+
+    File(target, "README.md").writeText(
+        buildProjectReadme(
+            projectName = target.name,
+            targets = normalizedTargets,
+        ),
+    )
 }
 
 private fun renderProjectTemplate(

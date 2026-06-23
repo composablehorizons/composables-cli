@@ -31,6 +31,7 @@ class CliTest {
             val sharedBuildFile = File(projectDir, "shared/build.gradle.kts")
             val desktopBuildFile = File(projectDir, "desktopApp/build.gradle.kts")
             val rootBuildFile = File(projectDir, "build.gradle.kts")
+            val readmeFile = File(projectDir, "README.md")
             val settingsFile = File(projectDir, "settings.gradle.kts")
             val appFile = File(projectDir, "shared/src/commonMain/kotlin/com/composables/demo/App.kt")
             val desktopMainFile = File(projectDir, "desktopApp/src/jvmMain/kotlin/com/composables/demo/main.kt")
@@ -38,6 +39,7 @@ class CliTest {
             assertThat(projectDir.isDirectory, "Generated project directory should exist").isTrue()
             assertThat(sharedBuildFile.exists(), "Generated shared module build file should exist").isTrue()
             assertThat(desktopBuildFile.exists(), "Generated desktop module build file should exist").isTrue()
+            assertThat(readmeFile.exists(), "Generated README should exist").isTrue()
             assertThat(settingsFile.exists(), "Generated settings file should exist").isTrue()
             assertThat(appFile.exists(), "App source should be moved to the requested package").isTrue()
             assertThat(desktopMainFile.exists(), "Desktop launcher source should exist").isTrue()
@@ -50,6 +52,7 @@ class CliTest {
             val sharedBuildContent = sharedBuildFile.readText()
             val desktopBuildContent = desktopBuildFile.readText()
             val rootBuildContent = rootBuildFile.readText()
+            val readmeContent = readmeFile.readText()
             val settingsContent = settingsFile.readText()
             val appContent = appFile.readText()
 
@@ -72,6 +75,11 @@ class CliTest {
             assertThat(settingsContent).contains("""rootProject.name = "newApp"""")
             assertThat(settingsContent).contains("""include(":shared")""")
             assertThat(settingsContent).contains("""include(":desktopApp")""")
+            assertThat(readmeContent).contains("# newApp")
+            assertThat(readmeContent).contains("`./gradlew :desktopApp:run`")
+            assertThat(readmeContent).doesNotContain(":androidApp:installDebug")
+            assertThat(readmeContent).doesNotContain("iosApp/iosApp.xcodeproj")
+            assertThat(readmeContent).doesNotContain(":webApp:wasmJsBrowserDevelopmentRun")
 
             assertThat(appContent).contains("package com.composables.demo")
             assertThat(appContent).contains("import androidx.compose.ui.tooling.preview.Preview")
@@ -111,16 +119,19 @@ class CliTest {
             val projectDir = File(targetDir, "newApp")
             val sharedBuildFile = File(projectDir, "sharedUi/build.gradle.kts")
             val androidAppBuildFile = File(projectDir, "androidApp/build.gradle.kts")
+            val readmeFile = File(projectDir, "README.md")
             val settingsFile = File(projectDir, "settings.gradle.kts")
             val mainActivityFile = File(projectDir, "androidApp/src/main/kotlin/com/composables/demo/MainActivity.kt")
 
             assertThat(sharedBuildFile).exists()
             assertThat(androidAppBuildFile).exists()
+            assertThat(readmeFile).exists()
             assertThat(mainActivityFile).exists()
             assertThat(File(projectDir, "sharedUi/src/androidMain").exists()).isFalse()
 
             val sharedBuildContent = sharedBuildFile.readText()
             val androidAppBuildContent = androidAppBuildFile.readText()
+            val readmeContent = readmeFile.readText()
             val settingsContent = settingsFile.readText()
 
             assertThat(sharedBuildContent).contains("alias(libs.plugins.android.kotlin.multiplatform.library)")
@@ -138,6 +149,15 @@ class CliTest {
             assertThat(settingsContent).contains("""include(":androidApp")""")
             assertThat(settingsContent).contains("""include(":desktopApp")""")
             assertThat(settingsContent).contains("""include(":webApp")""")
+
+            assertThat(readmeContent).contains("# newApp")
+            assertThat(readmeContent).contains("`./gradlew :desktopApp:run`")
+            assertThat(readmeContent).contains("`./gradlew :androidApp:installDebug`")
+            assertThat(readmeContent).contains("`iosApp/iosApp.xcodeproj`")
+            assertThat(readmeContent).contains("`./gradlew :webApp:wasmJsBrowserDevelopmentRun`")
+            assertThat(readmeContent.indexOf("- Android:") > readmeContent.indexOf("- JVM:")).isTrue()
+            assertThat(readmeContent.indexOf("- iOS:") > readmeContent.indexOf("- Android install from terminal:")).isTrue()
+            assertThat(readmeContent.indexOf("- Wasm:") > readmeContent.indexOf("- iOS:")).isTrue()
         }
     }
 
@@ -173,6 +193,7 @@ class CliTest {
             val rootBuildContent = File(projectDir, "build.gradle.kts").readText()
             val sharedBuildContent = File(projectDir, "shared/build.gradle.kts").readText()
             val webAppBuildContent = File(projectDir, "webApp/build.gradle.kts").readText()
+            val readmeContent = File(projectDir, "README.md").readText()
 
             assertThat(rootBuildContent).contains("wasmJsBrowserDistribution")
             assertThat(rootBuildContent).contains("wasm-preloads")
@@ -184,6 +205,9 @@ class CliTest {
             assertThat(sharedBuildContent).doesNotContain("js {")
             assertThat(webAppBuildContent).contains("implementation(libs.compose.ui)")
             assertThat(webAppBuildContent).contains("wasmJs {")
+            assertThat(readmeContent).contains("# newApp")
+            assertThat(readmeContent).contains("`./gradlew :webApp:wasmJsBrowserDevelopmentRun`")
+            assertThat(readmeContent).doesNotContain(":desktopApp:run")
         }
     }
 
