@@ -173,7 +173,7 @@ class CliTest {
 
             val content = File(targetDir, "gradle/libs.versions.toml").readText()
 
-            assertThat(content.countOccurrences("""agp = "8.8.2"""")).isEqualTo(1)
+            assertThat(content.countOccurrences("""agp = "9.2.1"""")).isEqualTo(1)
             assertThat(content.countOccurrences("""androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }""")).isEqualTo(1)
             assertThat(content.countOccurrences("""composables-ui = { group = "com.composables", name = "ui", version.ref = "composablesUi" }""")).isEqualTo(1)
             assertThat(content.countOccurrences("""android-application = { id = "com.android.application", version.ref = "agp" }""")).isEqualTo(1)
