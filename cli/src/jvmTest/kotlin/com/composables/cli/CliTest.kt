@@ -230,7 +230,7 @@ class CliTest {
             assertThat(content.countOccurrences("alias(libs.plugins.jetbrains.kotlin.multiplatform) apply false")).isEqualTo(1)
             assertThat(content.countOccurrences("alias(libs.plugins.jetbrains.compose) apply false")).isEqualTo(1)
             assertThat(content.countOccurrences("alias(libs.plugins.jetbrains.compose.compiler) apply false")).isEqualTo(1)
-            assertThat(content.countOccurrences("alias(libs.plugins.jetbrains.compose.hotreload) apply false")).isEqualTo(1)
+            assertThat(content).doesNotContain("alias(libs.plugins.jetbrains.compose.hotreload)")
             assertThat(content.countOccurrences("alias(libs.plugins.android.application) apply false")).isEqualTo(1)
             assertThat(content.countOccurrences("alias(libs.plugins.android.kotlin.multiplatform.library) apply false")).isEqualTo(1)
         }
@@ -264,7 +264,7 @@ class CliTest {
             assertThat(content.countOccurrences("""android-application = { id = "com.android.application", version.ref = "agp" }""")).isEqualTo(1)
             assertThat(content.countOccurrences("""android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }""")).isEqualTo(1)
             assertThat(content).contains("""compose = "1.11.1"""")
-            assertThat(content).contains("""composeHotReload = "1.1.0"""")
+            assertThat(content).doesNotContain("composeHotReload")
             assertThat(content).contains("""composablesUi = "0.1.0"""")
         }
     }

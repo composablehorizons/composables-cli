@@ -1816,9 +1816,6 @@ fun updateRootBuildFile(
                 requiredPlugins.add("    alias(libs.plugins.jetbrains.compose.compiler) apply false")
             }
         }
-        if (!pluginsContent.contains("libs.plugins.jetbrains.compose.hotreload")) {
-            requiredPlugins.add("    alias(libs.plugins.jetbrains.compose.hotreload) apply false")
-        }
         if (normalizedTargets.contains(ANDROID) && !pluginsContent.contains("libs.plugins.android.application")) {
             requiredPlugins.add("    alias(libs.plugins.android.application) apply false")
         }
@@ -1840,7 +1837,6 @@ fun updateRootBuildFile(
         requiredPlugins.add("    alias(libs.plugins.jetbrains.kotlin.multiplatform) apply false")
         requiredPlugins.add("    alias(libs.plugins.jetbrains.compose) apply false")
         requiredPlugins.add("    alias(libs.plugins.jetbrains.compose.compiler) apply false")
-        requiredPlugins.add("    alias(libs.plugins.jetbrains.compose.hotreload) apply false")
         if (normalizedTargets.contains(ANDROID)) {
             requiredPlugins.add("    alias(libs.plugins.android.application) apply false")
             requiredPlugins.add("    alias(libs.plugins.android.kotlin.multiplatform.library) apply false")
@@ -1890,9 +1886,6 @@ fun updateVersionCatalog(
     if (!hasVersionVariable(versionsSection, "compose")) {
         newVersions.add("compose = \"1.11.1\"")
     }
-    if (!hasVersionVariable(versionsSection, "composeHotReload")) {
-        newVersions.add("composeHotReload = \"1.1.0\"")
-    }
     if (!hasVersionVariable(versionsSection, "composablesUi")) {
         newVersions.add("composablesUi = \"0.1.0\"")
     }
@@ -1934,9 +1927,6 @@ fun updateVersionCatalog(
     }
     if (!hasPluginVariable(pluginsSection, "jetbrains-compose-compiler")) {
         newPlugins.add("jetbrains-compose-compiler = { id = \"org.jetbrains.kotlin.plugin.compose\", version.ref = \"kotlin\" }")
-    }
-    if (!hasPluginVariable(pluginsSection, "jetbrains-compose-hotreload")) {
-        newPlugins.add("jetbrains-compose-hotreload = { id = \"org.jetbrains.compose.hot-reload\", version.ref = \"composeHotReload\" }")
     }
     if (targets.contains("android") && !hasPluginVariable(pluginsSection, "android-application")) {
         newPlugins.add("android-application = { id = \"com.android.application\", version.ref = \"agp\" }")
