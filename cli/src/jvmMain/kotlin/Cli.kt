@@ -28,7 +28,7 @@ private fun normalizeTargets(targets: Set<String>): LinkedHashSet<String> = link
     addAll(targets)
 }
 
-private fun buildProjectReadme(
+internal fun buildProjectReadme(
     projectName: String,
     moduleName: String,
     targets: Set<String>,
@@ -44,9 +44,6 @@ private fun buildProjectReadme(
     if (targets.contains(JVM)) {
         sections.add("- JVM desktop: `./gradlew :$moduleName:run`")
     }
-    if (targets.contains(WASM)) {
-        sections.add("- Wasm browser: `./gradlew :$moduleName:wasmJsBrowserDevelopmentRun`")
-    }
     if (targets.contains(ANDROID)) {
         sections.add("- Android: open the project in Android Studio and run the `$moduleName` app on a device or emulator")
         sections.add("- Android install from terminal: `./gradlew :$moduleName:installDebug`")
@@ -54,6 +51,9 @@ private fun buildProjectReadme(
     if (targets.contains(IOS)) {
         val iosAppName = "ios${toCamelCase(moduleName)}"
         sections.add("- iOS: open `$iosAppName/$iosAppName.xcodeproj` in Xcode and run the app on a simulator or device")
+    }
+    if (targets.contains(WASM)) {
+        sections.add("- Wasm browser: `./gradlew :$moduleName:wasmJsBrowserDevelopmentRun`")
     }
 
     return sections.joinToString("\n") + "\n"

@@ -109,6 +109,24 @@ class CliTest {
     }
 
     @Test
+    fun `buildProjectReadme orders run instructions by platform priority`() {
+        val readme = buildProjectReadme(
+            projectName = "sample",
+            moduleName = "composeApp",
+            targets = linkedSetOf(WASM, IOS, ANDROID, JVM),
+        )
+
+        val jvmIndex = readme.indexOf("JVM desktop")
+        val androidIndex = readme.indexOf("Android: open")
+        val iosIndex = readme.indexOf("iOS: open")
+        val wasmIndex = readme.indexOf("Wasm browser")
+
+        assertThat(jvmIndex < androidIndex).isTrue()
+        assertThat(androidIndex < iosIndex).isTrue()
+        assertThat(iosIndex < wasmIndex).isTrue()
+    }
+
+    @Test
     fun `cloneGradleProject renders wasm preload wiring only when wasm target is selected`() {
         withTempDir { targetDir ->
             cloneGradleProject(
