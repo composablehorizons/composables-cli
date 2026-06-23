@@ -76,7 +76,7 @@ class CliTest {
             assertThat(settingsContent).contains("""include(":shared")""")
             assertThat(settingsContent).contains("""include(":desktopApp")""")
             assertThat(readmeContent).contains("# newApp")
-            assertThat(readmeContent).contains("`./gradlew :desktopApp:run`")
+            assertThat(readmeContent).contains("`./gradlew :desktopApp:hotRunJvm`")
             assertThat(readmeContent).doesNotContain(":androidApp:installDebug")
             assertThat(readmeContent).doesNotContain("iosApp/iosApp.xcodeproj")
             assertThat(readmeContent).doesNotContain(":webApp:wasmJsBrowserDevelopmentRun")
@@ -151,7 +151,7 @@ class CliTest {
             assertThat(settingsContent).contains("""include(":webApp")""")
 
             assertThat(readmeContent).contains("# newApp")
-            assertThat(readmeContent).contains("`./gradlew :desktopApp:run`")
+            assertThat(readmeContent).contains("`./gradlew :desktopApp:hotRunJvm`")
             assertThat(readmeContent).contains("`./gradlew :androidApp:installDebug`")
             assertThat(readmeContent).contains("`iosApp/iosApp.xcodeproj`")
             assertThat(readmeContent).contains("`./gradlew :webApp:wasmJsBrowserDevelopmentRun`")
@@ -207,7 +207,7 @@ class CliTest {
             assertThat(webAppBuildContent).contains("wasmJs {")
             assertThat(readmeContent).contains("# newApp")
             assertThat(readmeContent).contains("`./gradlew :webApp:wasmJsBrowserDevelopmentRun`")
-            assertThat(readmeContent).doesNotContain(":desktopApp:run")
+            assertThat(readmeContent).doesNotContain(":desktopApp:hotRunJvm")
         }
     }
 

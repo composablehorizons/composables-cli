@@ -48,7 +48,7 @@ private fun buildProjectReadme(
     lines += ""
 
     if (normalizedTargets.contains(JVM)) {
-        lines += "- JVM: `./gradlew :$DESKTOP_APP_MODULE:run`"
+        lines += "- JVM: `./gradlew :$DESKTOP_APP_MODULE:hotRunJvm`"
     }
     if (normalizedTargets.contains(ANDROID)) {
         lines += "- Android: open the project in Android Studio and run the `$ANDROID_APP_MODULE` app on a device or emulator"
@@ -1369,7 +1369,7 @@ fun cloneGradleProjectAndPrint(
     infoln { "" }
     infoln { "\tcd ${target.absolutePath}" }
     val startCommand = when {
-        targets.contains(JVM) -> "$gradleScript :$DESKTOP_APP_MODULE:run"
+        targets.contains(JVM) -> "$gradleScript :$DESKTOP_APP_MODULE:hotRunJvm"
         targets.contains(WASM) -> "$gradleScript :$WEB_APP_MODULE:wasmJsBrowserDevelopmentRun"
         else -> "$gradleScript build"
     }
