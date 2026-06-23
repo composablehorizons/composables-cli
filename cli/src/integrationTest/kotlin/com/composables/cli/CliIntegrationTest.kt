@@ -45,6 +45,7 @@ class CliIntegrationTest {
             assertThat(initResult.finished).isTrue()
             assertThat(initResult.exitCode).isEqualTo(0)
             assertThat(initResult.output).contains("Success! Your new Compose app is ready")
+            assertJvmReadme(projectDir)
 
             val compileResult = runProcess(
                 command = listOf(projectGradleScript(), ":shared:compileKotlinJvm"),
@@ -86,6 +87,7 @@ class CliIntegrationTest {
             assertThat(createResult.finished).isTrue()
             assertThat(createResult.exitCode).isEqualTo(0)
             assertThat(createResult.output).contains("Success! Your new Compose app is ready")
+            assertJvmReadme(projectDir)
 
             val compileResult = runProcess(
                 command = listOf(projectGradleScript(), ":shared:compileKotlinJvm"),
@@ -118,6 +120,7 @@ class CliIntegrationTest {
             assertThat(createResult.finished).isTrue()
             assertThat(createResult.exitCode).isEqualTo(0)
             assertThat(createResult.output).contains("Success! Your new Compose app is ready")
+            assertJvmReadme(projectDir)
 
             val compileResult = runProcess(
                 command = listOf(projectGradleScript(), ":shared:compileKotlinJvm"),
@@ -233,6 +236,19 @@ class CliIntegrationTest {
         "gradlew.bat"
     } else {
         "./gradlew"
+    }
+
+    private fun assertJvmReadme(projectDir: File) {
+        val readme = File(projectDir, "README.md")
+        assertThat(readme.exists()).isTrue()
+
+        val content = readme.readText()
+        assertThat(content).contains("# ${projectDir.name}")
+        assertThat(content).contains("## Run")
+        assertThat(content).contains("`./gradlew :desktopApp:run`")
+        assertThat(content).doesNotContain(":androidApp:installDebug")
+        assertThat(content).doesNotContain("iosApp/iosApp.xcodeproj")
+        assertThat(content).doesNotContain(":webApp:wasmJsBrowserDevelopmentRun")
     }
 
     private fun runProcess(
