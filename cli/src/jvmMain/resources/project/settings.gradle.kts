@@ -36,3 +36,4 @@ plugins {
 }
 
 include(":{{module_name}}")
+{{android_include}}

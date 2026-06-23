@@ -39,6 +39,7 @@ class CliTest {
             assertThat(appFile.exists(), "App source should be moved to the requested package").isTrue()
 
             assertThat(File(projectDir, "iosDesktopApp").exists(), "iOS app scaffold should be skipped for JVM-only template runs").isFalse()
+            assertThat(File(projectDir, "androidApp").exists(), "Android app scaffold should be skipped for JVM-only template runs").isFalse()
             assertThat(File(projectDir, "desktopApp/src/androidMain").exists(), "Android sources should be omitted for JVM-only template runs").isFalse()
             assertThat(File(projectDir, "desktopApp/src/wasmJsMain").exists(), "Wasm sources should be omitted for JVM-only template runs").isFalse()
 
@@ -84,6 +85,46 @@ class CliTest {
 
         assertThat(targetDir.absolutePath).isEqualTo(projectPath)
         assertThat(targetDir.name).isEqualTo("sample-app")
+    }
+
+    @Test
+    fun `cloneGradleProject renders Android as a separate app module`() {
+        withTempDir { targetDir ->
+            cloneGradleProject(
+                targetDir = targetDir.absolutePath,
+                dirName = "newApp",
+                packageName = "com.composables.demo",
+                moduleName = "sharedUi",
+                appName = "The App",
+                targets = setOf(ANDROID, JVM, IOS, WASM),
+            )
+
+            val projectDir = File(targetDir, "newApp")
+            val sharedBuildFile = File(projectDir, "sharedUi/build.gradle.kts")
+            val androidAppBuildFile = File(projectDir, "androidApp/build.gradle.kts")
+            val settingsFile = File(projectDir, "settings.gradle.kts")
+            val mainActivityFile = File(projectDir, "androidApp/src/main/kotlin/com/composables/demo/MainActivity.kt")
+
+            assertThat(sharedBuildFile).exists()
+            assertThat(androidAppBuildFile).exists()
+            assertThat(mainActivityFile).exists()
+            assertThat(File(projectDir, "sharedUi/src/androidMain").exists()).isFalse()
+
+            val sharedBuildContent = sharedBuildFile.readText()
+            val androidAppBuildContent = androidAppBuildFile.readText()
+            val settingsContent = settingsFile.readText()
+
+            assertThat(sharedBuildContent).contains("alias(libs.plugins.android.kotlin.multiplatform.library)")
+            assertThat(sharedBuildContent).contains("androidLibrary {")
+            assertThat(sharedBuildContent).doesNotContain("alias(libs.plugins.android.application)")
+            assertThat(sharedBuildContent).doesNotContain("androidMain.dependencies")
+            assertThat(sharedBuildContent).doesNotContain("defaultConfig {")
+
+            assertThat(androidAppBuildContent).contains("alias(libs.plugins.android.application)")
+            assertThat(androidAppBuildContent).contains("buildFeatures {")
+            assertThat(androidAppBuildContent).contains("implementation(projects.sharedUi)")
+            assertThat(settingsContent).contains("""include(":androidApp")""")
+        }
     }
 
     @Test
@@ -149,6 +190,7 @@ class CliTest {
             assertThat(content.countOccurrences("alias(libs.plugins.jetbrains.compose.compiler) apply false")).isEqualTo(1)
             assertThat(content.countOccurrences("alias(libs.plugins.jetbrains.compose.hotreload) apply false")).isEqualTo(1)
             assertThat(content.countOccurrences("alias(libs.plugins.android.application) apply false")).isEqualTo(1)
+            assertThat(content.countOccurrences("alias(libs.plugins.android.kotlin.multiplatform.library) apply false")).isEqualTo(1)
         }
     }
 
@@ -177,6 +219,7 @@ class CliTest {
             assertThat(content.countOccurrences("""androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }""")).isEqualTo(1)
             assertThat(content.countOccurrences("""composables-ui = { group = "com.composables", name = "ui", version.ref = "composablesUi" }""")).isEqualTo(1)
             assertThat(content.countOccurrences("""android-application = { id = "com.android.application", version.ref = "agp" }""")).isEqualTo(1)
+            assertThat(content.countOccurrences("""android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }""")).isEqualTo(1)
             assertThat(content).contains("""compose = "1.11.1"""")
             assertThat(content).contains("""composeHotReload = "1.1.0"""")
             assertThat(content).contains("""composablesUi = "0.1.0"""")
