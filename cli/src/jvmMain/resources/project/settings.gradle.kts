@@ -35,5 +35,7 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
-include(":{{module_name}}")
+include(":{{shared_module_name}}")
 {{android_include}}
+{{desktop_include}}
+{{web_include}}

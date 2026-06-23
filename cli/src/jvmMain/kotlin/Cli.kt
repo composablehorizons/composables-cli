@@ -21,6 +21,11 @@ val ANDROID = "android"
 val JVM = "jvm"
 val IOS = "ios"
 val WASM = "wasm"
+val SHARED_MODULE = "shared"
+val ANDROID_APP_MODULE = "androidApp"
+val IOS_APP_MODULE = "iosApp"
+val DESKTOP_APP_MODULE = "desktopApp"
+val WEB_APP_MODULE = "webApp"
 
 private fun File.toResourcePath(): String = invariantSeparatorsPath.replace('\\', '/')
 
@@ -129,7 +134,7 @@ class CreateApp : CliktCommand("create-app") {
             packageName = resolvedPackageName,
             appName = resolvedAppName,
             targets = targets,
-            moduleName = "composeApp",
+            moduleName = SHARED_MODULE,
         )
     }
 }
@@ -240,11 +245,11 @@ class Init : CliktCommand("init") {
 
     private fun readModuleName(projectName: String): String {
         while (true) {
-            echo("Enter module name (default: composeApp): ", trailingNewline = false)
+            echo("Enter module name (default: $SHARED_MODULE): ", trailingNewline = false)
             val moduleName = readln().trim()
 
             if (moduleName.isEmpty()) {
-                return "composeApp"
+                return SHARED_MODULE
             }
 
             if (moduleName == projectName) {
@@ -263,15 +268,15 @@ class Init : CliktCommand("init") {
 
     private fun readUniqueModuleName(targetDir: File): String {
         while (true) {
-            echo("Enter module name (default: composeApp): ", trailingNewline = false)
+            echo("Enter module name (default: $SHARED_MODULE): ", trailingNewline = false)
             val moduleName = readln().trim()
 
             if (moduleName.isEmpty()) {
-                if (File(targetDir, "composeApp").exists()) {
-                    echo("Module name 'composeApp' already exists. Please choose a different name.")
+                if (File(targetDir, SHARED_MODULE).exists()) {
+                    echo("Module name '$SHARED_MODULE' already exists. Please choose a different name.")
                     continue
                 }
-                return "composeApp"
+                return SHARED_MODULE
             }
 
             if (!isValidModuleName(moduleName)) {
@@ -630,6 +635,11 @@ class Target : CliktCommand("target") {
     private fun findComposeModuleBuildFile(workingDir: String): File? {
         val dir = File(workingDir)
 
+        val sharedBuildFile = File(dir, "$SHARED_MODULE/build.gradle.kts")
+        if (sharedBuildFile.exists()) {
+            return sharedBuildFile
+        }
+
         val composeModules = dir.listFiles()?.filter { subDir ->
             subDir.isDirectory && File(subDir, "build.gradle.kts").exists()
         }?.filter { subDir ->
@@ -686,7 +696,7 @@ class Target : CliktCommand("target") {
 
     private fun hasWasmTarget(buildFile: File): Boolean {
         val content = buildFile.readText()
-        return content.contains("wasmJs(")
+        return content.contains("wasmJs")
     }
 
     private fun addAndroidTarget(workingDir: String, buildFile: File) {
@@ -724,7 +734,7 @@ class Target : CliktCommand("target") {
             val androidTargetLines = listOf(
                 "",
                 "    androidLibrary {",
-                "        namespace = \"$namespace.composeapp\"",
+                "        namespace = \"$namespace.shared\"",
                 "        compileSdk = libs.versions.android.compileSdk.get().toInt()",
                 "        minSdk = libs.versions.android.minSdk.get().toInt()",
                 "        withJava()",
@@ -749,7 +759,7 @@ class Target : CliktCommand("target") {
             sharedModuleName = moduleName,
             namespace = namespace,
         )
-        addAndroidAppModuleToSettings(workingDir)
+        addModuleIncludeToSettings(workingDir, ANDROID_APP_MODULE)
 
         // Update root build.gradle.kts
         updateRootBuildFile(workingDir, setOf(ANDROID))
@@ -858,7 +868,7 @@ class Target : CliktCommand("target") {
         sharedModuleName: String,
         namespace: String,
     ) {
-        val androidAppDir = File(projectDir, "androidApp")
+        val androidAppDir = File(projectDir, ANDROID_APP_MODULE)
         androidAppDir.mkdirs()
         File(androidAppDir, "build.gradle.kts").writeText(
             """
@@ -951,9 +961,9 @@ class Target : CliktCommand("target") {
             return resources
         }
 
-        val resources = listResources("/project/androidApp/src/main")
+        val resources = listResources("/project/$ANDROID_APP_MODULE/src/main")
         resources.forEach { resourcePath ->
-            val targetPath = resourcePath.removePrefix("/project/androidApp/src/main/")
+            val targetPath = resourcePath.removePrefix("/project/$ANDROID_APP_MODULE/src/main/")
                 .replace("org/example/project", namespace.replace(".", "/"))
             val targetFile = File(androidAppDir, "src/main/$targetPath")
             copyResource(resourcePath, targetFile)
@@ -973,35 +983,22 @@ class Target : CliktCommand("target") {
         }
     }
 
-    private fun addAndroidAppModuleToSettings(workingDir: String) {
+    private fun addModuleIncludeToSettings(
+        workingDir: String,
+        moduleName: String,
+    ) {
         val settingsFile = File(workingDir, "settings.gradle.kts")
         if (!settingsFile.exists()) return
 
         val content = settingsFile.readText()
-        if (content.contains("""include(":androidApp")""")) return
+        if (content.contains("""include(":$moduleName")""")) return
 
-        settingsFile.writeText(content.trimEnd() + "\ninclude(\":androidApp\")\n")
+        settingsFile.writeText(content.trimEnd() + "\ninclude(\":$moduleName\")\n")
     }
 
     private fun addJvmTarget(workingDir: String, buildFile: File) {
-        var content = buildFile.readText()
+        val content = buildFile.readText()
         val lines = content.lines().toMutableList()
-
-        // Add import if needed
-        if (!content.contains("import org.jetbrains.compose.desktop.application.dsl.TargetFormat")) {
-            val importLine = "import org.jetbrains.compose.desktop.application.dsl.TargetFormat"
-            // Find the last import line and add after it
-            val lastImportIndex = lines.indexOfLast { it.startsWith("import ") }
-            if (lastImportIndex >= 0) {
-                lines.add(lastImportIndex + 1, importLine)
-            } else {
-                // Add before the first non-empty, non-comment line
-                val firstCodeLine = lines.indexOfFirst { !it.trim().isEmpty() && !it.trim().startsWith("//") }
-                if (firstCodeLine >= 0) {
-                    lines.add(firstCodeLine, importLine)
-                }
-            }
-        }
 
         // Append to kotlin block
         val kotlinCloseIndex = findKotlinBlockEnd(lines)
@@ -1009,117 +1006,21 @@ class Target : CliktCommand("target") {
             lines.add(kotlinCloseIndex, "    jvm()")
         }
 
-        // Append to sourceSets block
-        val sourceSetsCloseIndex = findSourceSetsBlockEnd(lines)
-        if (sourceSetsCloseIndex >= 0) {
-            val jvmMainLines = listOf(
-                "",
-                "        jvmMain.dependencies {",
-                "            implementation(compose.desktop.currentOs)",
-                "            implementation(\"com.composables:ui:0.1.0\")",
-                "        }",
-            )
-            jvmMainLines.reversed().forEach { line ->
-                lines.add(sourceSetsCloseIndex, line)
-            }
-        }
-
-        // Add compose.desktop block at the end
-        val namespace = extractNamespace(lines)
-        val desktopBlock = listOf(
-            "",
-            "compose.desktop {",
-            "    application {",
-            "        mainClass = \"$namespace.MainKt\"",
-            "",
-            "        nativeDistributions {",
-            "            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)",
-            "            packageName = \"${namespace}\"",
-            "            packageVersion = \"1.0.0\"",
-            "        }",
-            "    }",
-            "}",
-        )
-        lines.addAll(desktopBlock)
-
         // Write updated content
         buildFile.writeText(lines.joinToString("\n"))
 
-        // Create jvmMain source set and main function
         val moduleDir = buildFile.parentFile
-        createJvmSourceSet(moduleDir, namespace)
-    }
+        val moduleName = moduleDir.name
+        val namespace = inferNamespace(moduleDir)
 
-    private fun createJvmSourceSet(moduleDir: File, namespace: String) {
-        val jvmMainDir = File(moduleDir, "src/jvmMain/kotlin")
-        val packageDir = File(jvmMainDir, namespace.replace(".", "/"))
-
-        // Create directories
-        packageDir.mkdirs()
-
-        // Create main.desktop.kt
-        val mainFile = File(packageDir, "main.desktop.kt")
-        val mainContent = """@file:JvmName("MainKt")
-package $namespace
-
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.singleWindowApplication
-import com.composables.ui.components.Text
-import com.composables.ui.theme.ComposablesTheme
-import org.jetbrains.compose.ui.tooling.preview.Preview
-
-fun main() = singleWindowApplication {
-    DesktopApp()
-}
-
-@Composable
-fun DesktopApp() {
-    ComposablesTheme {
-        Box(
-            modifier = Modifier
-                .safeDrawingPadding()
-                .fillMaxSize()
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
-            ) {
-                Text(
-                    text = "Hello Beautiful World!",
-                    textAlign = TextAlign.Center,
-                )
-                Text(
-                    text = "Go to main.desktop.kt to edit your app",
-                    textAlign = TextAlign.Center,
-                )
-                Text(
-                    text = "Pro tip: Use the `dev` configuration in your IDE to auto-reload your app when you edit your code",
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-    }
-}
-
-@Preview
-@Composable
-fun DesktopAppPreview() {
-    DesktopApp()
-}
-"""
-        mainFile.writeText(mainContent)
+        createDesktopAppModule(
+            projectDir = File(workingDir),
+            sharedModuleName = moduleName,
+            namespace = namespace,
+        )
+        addModuleIncludeToSettings(workingDir, DESKTOP_APP_MODULE)
+        updateRootBuildFile(workingDir, setOf(JVM))
+        updateVersionCatalog(workingDir, setOf(JVM))
     }
 
     private fun addIosTarget(workingDir: String, buildFile: File) {
@@ -1258,25 +1159,12 @@ fun IosAppPreview() {
     }
 
     private fun addWasmTarget(workingDir: String, buildFile: File) {
-        var content = buildFile.readText()
+        val content = buildFile.readText()
         val lines = content.lines().toMutableList()
 
         // Add imports if needed
         if (!content.contains("import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl")) {
             val importLine = "import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl"
-            val lastImportIndex = lines.indexOfLast { it.startsWith("import ") }
-            if (lastImportIndex >= 0) {
-                lines.add(lastImportIndex + 1, importLine)
-            } else {
-                val firstCodeLine = lines.indexOfFirst { !it.trim().isEmpty() && !it.trim().startsWith("//") }
-                if (firstCodeLine >= 0) {
-                    lines.add(firstCodeLine, importLine)
-                }
-            }
-        }
-
-        if (!content.contains("import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig")) {
-            val importLine = "import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig"
             val lastImportIndex = lines.indexOfLast { it.startsWith("import ") }
             if (lastImportIndex >= 0) {
                 lines.add(lastImportIndex + 1, importLine)
@@ -1295,20 +1183,7 @@ fun IosAppPreview() {
                 "",
                 "    @OptIn(ExperimentalWasmDsl::class)",
                 "    wasmJs {",
-                "        browser {",
-                "            val rootDirPath = project.rootDir.path",
-                "            val projectDirPath = project.projectDir.path",
-                "            commonWebpackConfig {",
-                "                outputFileName = \"composeApp.js\"",
-                "                devServer = (devServer ?: KotlinWebpackConfig.DevServer()).apply {",
-                "                    static = (static ?: mutableListOf()).apply {",
-                "                        add(rootDirPath)",
-                "                        add(projectDirPath)",
-                "                    }",
-                "                }",
-                "            }",
-                "        }",
-                "        binaries.executable()",
+                "        browser()",
                 "    }",
             )
             wasmTargetLines.reversed().forEach { line ->
@@ -1320,16 +1195,48 @@ fun IosAppPreview() {
         buildFile.writeText(lines.joinToString("\n"))
 
         val moduleDir = buildFile.parentFile
+        val moduleName = moduleDir.name
+        val namespace = inferNamespace(moduleDir)
 
-        // Copy webpack.config.d directory
-        copyWebpackConfigDirectory(moduleDir)
-
-        // Copy resources directory
-        copyWasmResourcesDirectory(moduleDir)
+        createWebAppModule(
+            projectDir = File(workingDir),
+            sharedModuleName = moduleName,
+            namespace = namespace,
+        )
+        addModuleIncludeToSettings(workingDir, WEB_APP_MODULE)
+        updateRootBuildFile(workingDir, setOf(WASM))
+        updateVersionCatalog(workingDir, setOf(WASM))
     }
 
-    private fun copyWebpackConfigDirectory(moduleDir: File) {
-        val targetDir = File(moduleDir, "webpack.config.d")
+    private fun createDesktopAppModule(
+        projectDir: File,
+        sharedModuleName: String,
+        namespace: String,
+    ) {
+        val desktopAppDir = File(projectDir, DESKTOP_APP_MODULE)
+        desktopAppDir.mkdirs()
+        File(desktopAppDir, "build.gradle.kts").writeText(
+            object {}.javaClass.getResource("/project/$DESKTOP_APP_MODULE/build.gradle.kts")!!.readText()
+                .replace("{{shared_module_accessor}}", toProjectAccessorName(sharedModuleName))
+                .replace("{{namespace}}", namespace)
+                .trim() + "\n",
+        )
+
+        val mainFile = File(desktopAppDir, "src/jvmMain/kotlin/${namespace.replace(".", "/")}/main.kt")
+        mainFile.parentFile.mkdirs()
+        mainFile.writeText(
+            object {}.javaClass.getResource("/project/$DESKTOP_APP_MODULE/src/jvmMain/kotlin/org/example/main.kt")!!.readText()
+                .replace("{{namespace}}", namespace)
+                .trim() + "\n",
+        )
+    }
+
+    private fun createWebAppModule(
+        projectDir: File,
+        sharedModuleName: String,
+        namespace: String,
+    ) {
+        val webAppDir = File(projectDir, WEB_APP_MODULE)
 
         fun copyResource(resourcePath: String, targetFile: File) {
             val inputStream: InputStream? = object {}.javaClass.getResourceAsStream(resourcePath)
@@ -1378,88 +1285,34 @@ fun IosAppPreview() {
             return resources
         }
 
-        val resources = listResources("/project/composeApp/webpack.config.d")
-        resources.forEach { resourcePath ->
-            val targetPath = resourcePath.removePrefix("/project/composeApp/webpack.config.d/")
-            val targetFile = targetDir.resolve(targetPath)
-            copyResource(resourcePath, targetFile)
-        }
-    }
-
-    private fun copyWasmResourcesDirectory(moduleDir: File) {
-        val targetDir = File(moduleDir, "src/wasmJsMain/resources")
-
-        fun copyResource(resourcePath: String, targetFile: File) {
-            val inputStream: InputStream? = object {}.javaClass.getResourceAsStream(resourcePath)
-            if (inputStream != null) {
-                targetFile.parentFile?.mkdirs()
-                inputStream.use { input ->
-                    targetFile.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                }
-            }
-        }
-
-        fun listResources(path: String): List<String> {
-            val resources = mutableListOf<String>()
-            val resourceUrl = object {}.javaClass.getResource(path)
-
-            if (resourceUrl != null) {
-                when (resourceUrl.protocol) {
-                    "file" -> {
-                        val dir = File(resourceUrl.toURI())
-                        dir.walkTopDown().forEach { file ->
-                            if (file.isFile) {
-                                val relativePath = file.relativeTo(dir)
-                                resources.add("$path/${relativePath.toResourcePath()}")
-                            }
-                        }
-                    }
-
-                    "jar" -> {
-                        val jarPath = resourceUrl.path.substringBefore("!")
-                        val jarFile = JarFile(File(jarPath.substringAfter("file:")))
-                        val entries = jarFile.entries()
-
-                        while (entries.hasMoreElements()) {
-                            val entry = entries.nextElement()
-                            if (entry.name.startsWith(path.substring(1)) && !entry.isDirectory) {
-                                resources.add("/${entry.name}")
-                            }
-                        }
-                        jarFile.close()
-                    }
-                }
-            }
-
-            return resources
-        }
-
-        val resources = listResources("/project/composeApp/src/wasmJsMain/resources")
-        resources.forEach { resourcePath ->
-            val targetPath = resourcePath.removePrefix("/project/composeApp/src/wasmJsMain/resources/")
-            val targetFile = targetDir.resolve(targetPath)
+        listResources("/project/$WEB_APP_MODULE").forEach { resourcePath ->
+            var targetPath = resourcePath.removePrefix("/project/$WEB_APP_MODULE/")
+            targetPath = targetPath.replace("org/example", namespace.replace(".", "/"))
+            val targetFile = webAppDir.resolve(targetPath)
             copyResource(resourcePath, targetFile)
 
-            // Replace placeholders in text files
-            if (targetFile.name.endsWith(".html") || targetFile.name.endsWith(".css") || targetFile.name.endsWith(".js")) {
-                try {
-                    val content = targetFile.readText()
-                    var updatedContent = content.replace("{{app_name}}", "ComposeApp")
-                    if (content != updatedContent) {
-                        targetFile.writeText(updatedContent)
-                    }
-                } catch (e: Exception) {
-                    // Skip binary files
+            if (targetFile.isFile &&
+                (
+                    targetFile.extension == "kts" ||
+                        targetFile.extension == "kt" ||
+                        targetFile.extension == "html" ||
+                        targetFile.extension == "css" ||
+                        targetFile.extension == "js"
+                    )
+            ) {
+                val content = targetFile.readText()
+                val updatedContent = content
+                    .replace("{{shared_module_accessor}}", toProjectAccessorName(sharedModuleName))
+                    .replace("{{namespace}}", namespace)
+                if (content != updatedContent) {
+                    targetFile.writeText(updatedContent.trim() + "\n")
                 }
             }
         }
     }
 
     private fun copyIosAppDirectory(workingDir: String, moduleName: String) {
-        val iosAppName = "ios${toCamelCase(moduleName)}" // Dynamic iOS app name based on module
-        val targetDir = File(workingDir, iosAppName) // iOS app directory name based on module
+        val targetDir = File(workingDir, IOS_APP_MODULE)
 
         fun copyResource(resourcePath: String, targetFile: File) {
             val inputStream: InputStream? = object {}.javaClass.getResourceAsStream(resourcePath)
@@ -1508,9 +1361,9 @@ fun IosAppPreview() {
             return resources
         }
 
-        val resources = listResources("/project/iosApp")
+        val resources = listResources("/project/$IOS_APP_MODULE")
         resources.forEach { resourcePath ->
-            val targetPath = resourcePath.removePrefix("/project/iosApp/")
+            val targetPath = resourcePath.removePrefix("/project/$IOS_APP_MODULE/")
             val targetFile = targetDir.resolve(targetPath)
             copyResource(resourcePath, targetFile)
 
@@ -1527,7 +1380,7 @@ fun IosAppPreview() {
                     val content = targetFile.readText()
                     var updatedContent = content.replace("{{module_name}}", moduleName)
                     updatedContent = updatedContent.replace("{{ios_binary_name}}", toCamelCase(moduleName))
-                    updatedContent = updatedContent.replace("{{target_name}}", "${toCamelCase(moduleName)}.app")
+                    updatedContent = updatedContent.replace("{{target_name}}", "$IOS_APP_MODULE.app")
                     // For target command, use hardcoded defaults since appName/namespace aren't in scope
                     updatedContent = updatedContent.replace("{{app_name}}", "My App")
                     updatedContent = updatedContent.replace("{{namespace}}", "com.example.app")
@@ -1570,7 +1423,7 @@ fun cloneGradleProjectAndPrint(
     infoln { "Project Configuration:" }
     infoln { "\tApp Name: $appName" }
     infoln { "\tPackage: $packageName" }
-    infoln { "\tCompose Module: $moduleName" }
+    infoln { "\tShared Module: $moduleName" }
     infoln { "\tTargets: ${targets.joinToString(", ")}" }
     infoln { "" }
 
@@ -1578,7 +1431,12 @@ fun cloneGradleProjectAndPrint(
     debugln { "Start by typing:" }
     infoln { "" }
     infoln { "\tcd ${target.absolutePath}" }
-    infoln { "\t$gradleScript run" }
+    val startCommand = when {
+        targets.contains(JVM) -> "$gradleScript :$DESKTOP_APP_MODULE:run"
+        targets.contains(WASM) -> "$gradleScript :$WEB_APP_MODULE:wasmJsBrowserDevelopmentRun"
+        else -> "$gradleScript build"
+    }
+    infoln { "\t$startCommand" }
     infoln { "" }
     debugln { "Happy coding!" }
 }
@@ -1680,18 +1538,23 @@ private fun cloneGradleProjectAt(
         var targetPath = resourcePath.removePrefix("/project/")
 
         // Skip iOS directory if iOS target is not selected
-        val iosAppName = "ios${toCamelCase(moduleName)}"
-        if (!normalizedTargets.contains(IOS) && targetPath.startsWith("iosApp/")) {
+        if (!normalizedTargets.contains(IOS) && targetPath.startsWith("$IOS_APP_MODULE/")) {
             return@forEach
         }
-        if (!normalizedTargets.contains(ANDROID) && targetPath.startsWith("androidApp/")) {
+        if (!normalizedTargets.contains(ANDROID) && targetPath.startsWith("$ANDROID_APP_MODULE/")) {
+            return@forEach
+        }
+        if (!normalizedTargets.contains(JVM) && targetPath.startsWith("$DESKTOP_APP_MODULE/")) {
+            return@forEach
+        }
+        if (!normalizedTargets.contains(WASM) && targetPath.startsWith("$WEB_APP_MODULE/")) {
             return@forEach
         }
 
         // Skip source set directories if corresponding target is not selected
-        val isInsideAKotlinSourceSet = targetPath.startsWith("composeApp/src/")
+        val isInsideAKotlinSourceSet = targetPath.startsWith("$SHARED_MODULE/src/")
         if (isInsideAKotlinSourceSet) {
-            val sourceSetType = targetPath.substringAfter("composeApp/src/").substringBefore("/")
+            val sourceSetType = targetPath.substringAfter("$SHARED_MODULE/src/").substringBefore("/")
 
             when (sourceSetType) {
                 "androidMain" -> if (!normalizedTargets.contains(ANDROID)) return@forEach
@@ -1703,22 +1566,12 @@ private fun cloneGradleProjectAt(
             }
         }
 
-        if (!normalizedTargets.contains(WASM) && targetPath.startsWith("$moduleName/webpack.config.d/")) {
-            return@forEach
-        }
-
         // Replace org.example.project with the actual namespace in file paths
         targetPath = targetPath.replace("org/example/project", packageName.replace(".", "/"))
+        targetPath = targetPath.replace("org/example", packageName.replace(".", "/"))
 
-        // Replace composeApp with the actual module name in file paths
-        targetPath = targetPath.replace("composeApp", moduleName)
-
-        // Replace only the top-level iosApp directory with the dynamic iOS app name
-        if (targetPath.startsWith("iosApp/")) {
-            val newPath = iosAppName + "/" + targetPath.removePrefix("iosApp/")
-//                .replace("iosApp/", iosAppName + "/")
-            targetPath = newPath
-        }
+        // Replace shared module directory when a custom name is requested
+        targetPath = targetPath.replace(SHARED_MODULE, moduleName)
 
         val targetFile = target.resolve(targetPath)
         copyResource(resourcePath, targetFile)
@@ -1792,7 +1645,9 @@ android.useAndroidX=true
                     ""
                 }
 
-                val androidInclude = if (normalizedTargets.contains(ANDROID)) """include(":androidApp")""" else ""
+                val androidInclude = if (normalizedTargets.contains(ANDROID)) """include(":$ANDROID_APP_MODULE")""" else ""
+                val desktopInclude = if (normalizedTargets.contains(JVM)) """include(":$DESKTOP_APP_MODULE")""" else ""
+                val webInclude = if (normalizedTargets.contains(WASM)) """include(":$WEB_APP_MODULE")""" else ""
 
                 val webPreloadTaskWiring = if (normalizedTargets.contains(WASM)) {
                     """
@@ -1863,15 +1718,11 @@ subprojects {
 
                 // Build imports block
                 val imports = mutableListOf<String>()
-                if (normalizedTargets.contains(JVM)) {
-                    imports.add("import org.jetbrains.compose.desktop.application.dsl.TargetFormat")
+                if (normalizedTargets.contains(ANDROID)) {
+                    imports.add("import org.jetbrains.kotlin.gradle.dsl.JvmTarget")
                 }
                 if (normalizedTargets.contains(WASM)) {
                     imports.add("import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl")
-                    imports.add("import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig")
-                }
-                if (normalizedTargets.contains(ANDROID)) {
-                    imports.add("import org.jetbrains.kotlin.gradle.dsl.JvmTarget")
                 }
                 val importsBlock = if (imports.isNotEmpty()) imports.joinToString("\n") + "\n" else ""
 
@@ -1883,7 +1734,6 @@ subprojects {
                 if (!content.contains("libs.plugins.kotlin.compose")) {
                     plugins.add("    alias(libs.plugins.jetbrains.compose.compiler)")
                 }
-                plugins.add("    alias(libs.plugins.jetbrains.compose.hotreload)")
                 if (normalizedTargets.contains(ANDROID)) {
                     plugins.add("    alias(libs.plugins.android.kotlin.multiplatform.library)")
                 }
@@ -1894,7 +1744,7 @@ subprojects {
                 if (normalizedTargets.contains(ANDROID)) {
                     kotlinTargets.add(
                         """    androidLibrary {
-        namespace = "{{namespace}}.composeapp"
+        namespace = "{{namespace}}.shared"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
         withJava()
@@ -1928,21 +1778,7 @@ subprojects {
                     kotlinTargets.add(
                         """    @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
-        browser {
-            val rootDirPath = project.rootDir.path
-            val projectDirPath = project.projectDir.path
-            commonWebpackConfig {
-                outputFileName = "composeApp.js"
-                devServer = (devServer ?: KotlinWebpackConfig.DevServer()).apply {
-                    static = (static ?: mutableListOf()).apply {
-                        // Serve sources to debug inside browser
-                        add(rootDirPath)
-                        add(projectDirPath)
-                    }
-                }
-            }
-        }
-        binaries.executable()
+        browser()
     }""",
                     )
                 }
@@ -1959,45 +1795,23 @@ subprojects {
         }""",
                 )
 
-                if (normalizedTargets.contains(JVM)) {
-                    sourcesets.add(
-                        """        jvmMain.dependencies {
-            implementation(compose.desktop.currentOs)
-        }""",
-                    )
-                }
                 sourcesets.add("    }")
                 val sourcesetsBlock = sourcesets.joinToString("\n")
 
                 // Build configuration blocks
-                val configurations = mutableListOf<String>()
-                if (normalizedTargets.contains(JVM)) {
-                    configurations.add(
-                        """compose.desktop {
-    application {
-        mainClass = "{{namespace}}.MainKt"
-
-        nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "{{namespace}}"
-            packageVersion = "1.0.0"
-        }
-    }
-}""",
-                    )
-                }
-                val configurationBlocksBlock =
-                    if (configurations.isNotEmpty()) configurations.joinToString("\n\n") else ""
+                val configurationBlocksBlock = ""
 
                 updatedContent = updatedContent.replace("{{android_versions}}", androidVersions)
                 updatedContent = updatedContent.replace("{{android_libraries}}", androidLibraries)
                 updatedContent = updatedContent.replace("{{android_plugins}}", androidPlugins)
                 updatedContent = updatedContent.replace("{{android_root_plugins}}", androidRootPlugins)
                 updatedContent = updatedContent.replace("{{android_include}}", androidInclude)
+                updatedContent = updatedContent.replace("{{desktop_include}}", desktopInclude)
+                updatedContent = updatedContent.replace("{{web_include}}", webInclude)
                 updatedContent = updatedContent.replace("{{android_properties}}", androidProperties)
                 updatedContent = updatedContent.replace("{{web_preload_task_wiring}}", webPreloadTaskWiring)
 
-                // Replace composeApp build.gradle.kts blocks
+                // Replace shared build.gradle.kts blocks
                 updatedContent = updatedContent.replace("{{imports}}", importsBlock)
                 updatedContent = updatedContent.replace("{{plugins}}", pluginsBlock)
                 updatedContent = updatedContent.replace("{{kotlin_targets}}", kotlinTargetsBlock)
@@ -2008,10 +1822,11 @@ subprojects {
                 updatedContent = updatedContent.replace("{{namespace}}", packageName)
                 updatedContent = updatedContent.replace("{{project_name}}", target.name)
                 updatedContent = updatedContent.replace("{{module_name}}", moduleName)
+                updatedContent = updatedContent.replace("{{shared_module_name}}", moduleName)
                 updatedContent = updatedContent.replace("{{app_name}}", appName)
                 updatedContent = updatedContent.replace("{{shared_module_accessor}}", toProjectAccessorName(moduleName))
                 updatedContent = updatedContent.replace("{{ios_binary_name}}", toCamelCase(moduleName))
-                updatedContent = updatedContent.replace("{{target_name}}", toCamelCase(moduleName) + ".app")
+                updatedContent = updatedContent.replace("{{target_name}}", "$IOS_APP_MODULE.app")
                 if (content != updatedContent) {
                     file.writeText(updatedContent.trim() + "\n")
                 }
@@ -2127,7 +1942,75 @@ fun updateRootBuildFile(
     }
 
     if (modified) {
-        buildFile.writeText(lines.joinToString("\n"))
+        content = lines.joinToString("\n")
+        buildFile.writeText(content)
+    }
+
+    if (normalizedTargets.contains(WASM) && !content.contains("injectWasmPreloads")) {
+        buildFile.writeText(
+            buildFile.readText().trimEnd() + "\n\n" + """
+subprojects {
+    fun registerPreloadInjectionTask(
+        distributionTarget: String,
+        markerName: String,
+        includeWasmArtifacts: Boolean,
+    ) = tasks.register("inject${'$'}{distributionTarget.replaceFirstChar(Char::titlecase)}Preloads") {
+        description = "Injects preload links for generated ${'$'}distributionTarget distribution artifacts."
+        val distributionDir = layout.buildDirectory.dir("dist/${'$'}distributionTarget/productionExecutable")
+        val preloadMarker = markerName
+        val preloadWasmArtifacts = includeWasmArtifacts
+
+        doLast {
+            val distDir = distributionDir.get().asFile
+            val indexFile = distDir.resolve("index.html")
+            if (!indexFile.isFile) return@doLast
+
+            val scriptPreloads = distDir
+                .listFiles { file -> file.isFile && file.extension == "js" }
+                .orEmpty()
+                .sortedBy { it.name }
+                .map { "  <link rel=\"preload\" href=\"${'$'}{it.name}\" as=\"script\">" }
+
+            val artifactPreloads = if (preloadWasmArtifacts) {
+                distDir
+                    .listFiles { file -> file.isFile && file.extension == "wasm" }
+                    .orEmpty()
+                    .sortedBy { it.name }
+                    .map {
+                        "  <link rel=\"preload\" href=\"${'$'}{it.name}\" as=\"fetch\" type=\"application/wasm\" crossorigin>"
+                    }
+            } else {
+                emptyList()
+            }
+
+            val preloadBlock = (scriptPreloads + artifactPreloads).joinToString(
+                separator = "\n",
+                prefix = "  <!-- ${'$'}preloadMarker:start -->\n",
+                postfix = "\n  <!-- ${'$'}preloadMarker:end -->",
+            )
+
+            val existingPreloadBlock = Regex(
+                pattern = "\\n?  <!-- ${'$'}preloadMarker:start -->.*?  <!-- ${'$'}preloadMarker:end -->\\n?",
+                options = setOf(RegexOption.DOT_MATCHES_ALL),
+            )
+            val indexHtml = indexFile.readText().replace(existingPreloadBlock, "\n")
+            val updatedIndexHtml = indexHtml.replaceFirst("</title>", "</title>\n${'$'}preloadBlock")
+            indexFile.writeText(updatedIndexHtml)
+        }
+    }
+
+    val injectWasmPreloads = registerPreloadInjectionTask(
+        distributionTarget = "wasmJs",
+        markerName = "wasm-preloads",
+        includeWasmArtifacts = true,
+    )
+
+    tasks.matching { it.name == "wasmJsBrowserDistribution" }.configureEach {
+        finalizedBy(injectWasmPreloads)
+    }
+}
+            """.trimIndent() + "\n",
+        )
     }
 }
 
@@ -2369,9 +2252,9 @@ fun createModuleOnly(
     }
 
     // Copy only the module contents (not the entire project)
-    val resources = listResources("/project/composeApp")
+    val resources = listResources("/project/$SHARED_MODULE")
     resources.forEach { resourcePath ->
-        var targetPath = resourcePath.removePrefix("/project/composeApp/")
+        var targetPath = resourcePath.removePrefix("/project/$SHARED_MODULE/")
 
         // Skip source set directories if corresponding target is not selected
         val isInsideAKotlinSourceSet = targetPath.startsWith("src/")
@@ -2387,12 +2270,9 @@ fun createModuleOnly(
             }
         }
 
-        if (!normalizedTargets.contains(WASM) && targetPath.startsWith("webpack.config.d/")) {
-            return@forEach
-        }
-
         // Replace org.example.project with the actual namespace in file paths
         targetPath = targetPath.replace("org/example/project", packageName.replace(".", "/"))
+        targetPath = targetPath.replace("org/example", packageName.replace(".", "/"))
 
         val targetFile = moduleDir.resolve(targetPath)
         copyResource(resourcePath, targetFile)
@@ -2419,12 +2299,8 @@ fun createModuleOnly(
 
                 // Build imports block
                 val imports = mutableListOf<String>()
-                if (normalizedTargets.contains(JVM)) {
-                    imports.add("import org.jetbrains.compose.desktop.application.dsl.TargetFormat")
-                }
                 if (normalizedTargets.contains(WASM)) {
                     imports.add("import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl")
-                    imports.add("import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig")
                 }
                 if (normalizedTargets.contains(ANDROID)) {
                     imports.add("import org.jetbrains.kotlin.gradle.dsl.JvmTarget")
@@ -2439,7 +2315,6 @@ fun createModuleOnly(
                 if (!content.contains("libs.plugins.kotlin.compose")) {
                     plugins.add("    alias(libs.plugins.jetbrains.compose.compiler)")
                 }
-                plugins.add("    alias(libs.plugins.jetbrains.compose.hotreload)")
                 if (normalizedTargets.contains(ANDROID)) {
                     plugins.add("    alias(libs.plugins.android.kotlin.multiplatform.library)")
                 }
@@ -2450,7 +2325,7 @@ fun createModuleOnly(
                 if (normalizedTargets.contains(ANDROID)) {
                     kotlinTargets.add(
                         """    androidLibrary {
-        namespace = "{{namespace}}.composeapp"
+        namespace = "{{namespace}}.shared"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
         withJava()
@@ -2484,21 +2359,7 @@ fun createModuleOnly(
                     kotlinTargets.add(
                         """    @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
-        browser {
-            val rootDirPath = project.rootDir.path
-            val projectDirPath = project.projectDir.path
-            commonWebpackConfig {
-                outputFileName = "composeApp.js"
-                devServer = (devServer ?: KotlinWebpackConfig.DevServer()).apply {
-                    static = (static ?: mutableListOf()).apply {
-                        // Serve sources to debug inside browser
-                        add(rootDirPath)
-                        add(projectDirPath)
-                    }
-                }
-            }
-        }
-        binaries.executable()
+        browser()
     }""",
                     )
                 }
@@ -2515,37 +2376,13 @@ fun createModuleOnly(
         }""",
                 )
 
-                if (normalizedTargets.contains(JVM)) {
-                    sourcesets.add(
-                        """        jvmMain.dependencies {
-            implementation(compose.desktop.currentOs)
-        }""",
-                    )
-                }
                 sourcesets.add("    }")
                 val sourcesetsBlock = sourcesets.joinToString("\n")
 
                 // Build configuration blocks
-                val configurations = mutableListOf<String>()
-                if (normalizedTargets.contains(JVM)) {
-                    configurations.add(
-                        """compose.desktop {
-    application {
-        mainClass = "{{namespace}}.MainKt"
+                val configurationBlocksBlock = ""
 
-        nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "{{namespace}}"
-            packageVersion = "1.0.0"
-        }
-    }
-}""",
-                    )
-                }
-                val configurationBlocksBlock =
-                    if (configurations.isNotEmpty()) configurations.joinToString("\n\n") else ""
-
-                // Replace composeApp build.gradle.kts blocks
+                // Replace shared build.gradle.kts blocks
                 updatedContent = updatedContent.replace("{{imports}}", importsBlock)
                 updatedContent = updatedContent.replace("{{plugins}}", pluginsBlock)
                 updatedContent = updatedContent.replace("{{kotlin_targets}}", kotlinTargetsBlock)
@@ -2558,7 +2395,7 @@ fun createModuleOnly(
                 updatedContent = updatedContent.replace("{{app_name}}", appName)
                 updatedContent = updatedContent.replace("{{shared_module_accessor}}", toProjectAccessorName(moduleName))
                 updatedContent = updatedContent.replace("{{ios_binary_name}}", toCamelCase(moduleName))
-                updatedContent = updatedContent.replace("{{target_name}}", "${toCamelCase(moduleName)}.app")
+                updatedContent = updatedContent.replace("{{target_name}}", "$IOS_APP_MODULE.app")
                 if (content != updatedContent) {
                     file.writeText(updatedContent.trim() + "\n")
                 }
@@ -2585,8 +2422,7 @@ private fun createIosAppDirectory(
     targetDir: String,
     moduleName: String,
 ) {
-    val iosAppName = "ios${toCamelCase(moduleName)}"
-    val targetDir = File(targetDir, iosAppName)
+    val targetDir = File(targetDir, IOS_APP_MODULE)
 
     fun copyResource(resourcePath: String, targetFile: File) {
         val inputStream: InputStream? = object {}.javaClass.getResourceAsStream(resourcePath)
@@ -2635,9 +2471,9 @@ private fun createIosAppDirectory(
         return resources
     }
 
-    val resources = listResources("/project/iosApp")
+    val resources = listResources("/project/$IOS_APP_MODULE")
     resources.forEach { resourcePath ->
-        val targetPath = resourcePath.removePrefix("/project/iosApp/")
+        val targetPath = resourcePath.removePrefix("/project/$IOS_APP_MODULE/")
         val targetFile = targetDir.resolve(targetPath)
         copyResource(resourcePath, targetFile)
 
@@ -2652,7 +2488,7 @@ private fun createIosAppDirectory(
                 val content = targetFile.readText()
                 var updatedContent = content.replace("{{module_name}}", moduleName)
                 updatedContent = updatedContent.replace("{{ios_binary_name}}", toCamelCase(moduleName))
-                updatedContent = updatedContent.replace("{{target_name}}", "${toCamelCase(moduleName)}.app")
+                updatedContent = updatedContent.replace("{{target_name}}", "$IOS_APP_MODULE.app")
                 // Use defaults for module addition since we don't have app name/namespace in scope
                 updatedContent = updatedContent.replace("{{app_name}}", "My App")
                 updatedContent = updatedContent.replace("{{namespace}}", "com.example.app")

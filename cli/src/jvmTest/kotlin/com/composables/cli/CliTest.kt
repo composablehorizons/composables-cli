@@ -22,40 +22,45 @@ class CliTest {
                 targetDir = targetDir.absolutePath,
                 dirName = "newApp",
                 packageName = "com.composables.demo",
-                moduleName = "desktopApp",
+                moduleName = "shared",
                 appName = "The App",
                 targets = setOf(JVM),
             )
 
             val projectDir = File(targetDir, "newApp")
-            val buildFile = File(projectDir, "desktopApp/build.gradle.kts")
+            val sharedBuildFile = File(projectDir, "shared/build.gradle.kts")
+            val desktopBuildFile = File(projectDir, "desktopApp/build.gradle.kts")
             val rootBuildFile = File(projectDir, "build.gradle.kts")
             val settingsFile = File(projectDir, "settings.gradle.kts")
-            val appFile = File(projectDir, "desktopApp/src/commonMain/kotlin/com/composables/demo/App.kt")
+            val appFile = File(projectDir, "shared/src/commonMain/kotlin/com/composables/demo/App.kt")
+            val desktopMainFile = File(projectDir, "desktopApp/src/jvmMain/kotlin/com/composables/demo/main.kt")
 
             assertThat(projectDir.isDirectory, "Generated project directory should exist").isTrue()
-            assertThat(buildFile.exists(), "Generated module build file should exist").isTrue()
+            assertThat(sharedBuildFile.exists(), "Generated shared module build file should exist").isTrue()
+            assertThat(desktopBuildFile.exists(), "Generated desktop module build file should exist").isTrue()
             assertThat(settingsFile.exists(), "Generated settings file should exist").isTrue()
             assertThat(appFile.exists(), "App source should be moved to the requested package").isTrue()
+            assertThat(desktopMainFile.exists(), "Desktop launcher source should exist").isTrue()
 
-            assertThat(File(projectDir, "iosDesktopApp").exists(), "iOS app scaffold should be skipped for JVM-only template runs").isFalse()
+            assertThat(File(projectDir, "iosApp").exists(), "iOS app scaffold should be skipped for JVM-only template runs").isFalse()
             assertThat(File(projectDir, "androidApp").exists(), "Android app scaffold should be skipped for JVM-only template runs").isFalse()
-            assertThat(File(projectDir, "desktopApp/src/androidMain").exists(), "Android sources should be omitted for JVM-only template runs").isFalse()
-            assertThat(File(projectDir, "desktopApp/src/wasmJsMain").exists(), "Wasm sources should be omitted for JVM-only template runs").isFalse()
+            assertThat(File(projectDir, "webApp").exists(), "Web app scaffold should be skipped for JVM-only template runs").isFalse()
+            assertThat(File(projectDir, "shared/src/iosMain").exists(), "iOS sources should be omitted for JVM-only template runs").isFalse()
 
-            val buildContent = buildFile.readText()
+            val sharedBuildContent = sharedBuildFile.readText()
+            val desktopBuildContent = desktopBuildFile.readText()
             val rootBuildContent = rootBuildFile.readText()
             val settingsContent = settingsFile.readText()
             val appContent = appFile.readText()
 
-            assertThat(buildContent).contains("jvm()")
-            assertThat(buildContent).contains("implementation(libs.composables.ui)")
-            assertThat(buildContent).doesNotContain("androidTarget {")
-            assertThat(buildContent).doesNotContain("iosArm64()")
-            assertThat(buildContent).doesNotContain("wasmJs {")
-            assertThat(buildContent).doesNotContain("compose.material3")
-            assertThat(buildContent).contains("mainClass = \"com.composables.demo.MainKt\"")
-            assertThat(buildContent).doesNotContain("{{module_name}}")
+            assertThat(sharedBuildContent).contains("jvm()")
+            assertThat(sharedBuildContent).contains("implementation(libs.composables.ui)")
+            assertThat(sharedBuildContent).doesNotContain("androidLibrary {")
+            assertThat(sharedBuildContent).doesNotContain("iosArm64()")
+            assertThat(sharedBuildContent).doesNotContain("wasmJs()")
+            assertThat(sharedBuildContent).doesNotContain("{{shared_module_name}}")
+            assertThat(desktopBuildContent).contains("implementation(projects.shared)")
+            assertThat(desktopBuildContent).contains("mainClass = \"com.composables.demo.MainKt\"")
 
             assertThat(rootBuildContent).doesNotContain("composeCompatibilityBrowserDistribution")
             assertThat(rootBuildContent).doesNotContain("jsBrowserDistribution")
@@ -63,6 +68,7 @@ class CliTest {
             assertThat(rootBuildContent).doesNotContain("js-preloads")
             assertThat(rootBuildContent).doesNotContain("wasm-preloads")
             assertThat(settingsContent).contains("""rootProject.name = "newApp"""")
+            assertThat(settingsContent).contains("""include(":shared")""")
             assertThat(settingsContent).contains("""include(":desktopApp")""")
 
             assertThat(appContent).contains("package com.composables.demo")
@@ -124,6 +130,8 @@ class CliTest {
             assertThat(androidAppBuildContent).contains("buildFeatures {")
             assertThat(androidAppBuildContent).contains("implementation(projects.sharedUi)")
             assertThat(settingsContent).contains("""include(":androidApp")""")
+            assertThat(settingsContent).contains("""include(":desktopApp")""")
+            assertThat(settingsContent).contains("""include(":webApp")""")
         }
     }
 
@@ -150,22 +158,26 @@ class CliTest {
                 targetDir = targetDir.absolutePath,
                 dirName = "newApp",
                 packageName = "com.composables.demo",
-                moduleName = "composeApp",
+                moduleName = "shared",
                 appName = "The App",
                 targets = setOf(WASM),
             )
 
             val projectDir = File(targetDir, "newApp")
             val rootBuildContent = File(projectDir, "build.gradle.kts").readText()
-            val moduleBuildContent = File(projectDir, "composeApp/build.gradle.kts").readText()
+            val sharedBuildContent = File(projectDir, "shared/build.gradle.kts").readText()
+            val webAppBuildContent = File(projectDir, "webApp/build.gradle.kts").readText()
 
             assertThat(rootBuildContent).contains("wasmJsBrowserDistribution")
             assertThat(rootBuildContent).contains("wasm-preloads")
             assertThat(rootBuildContent).doesNotContain("composeCompatibilityBrowserDistribution")
             assertThat(rootBuildContent).doesNotContain("jsBrowserDistribution")
             assertThat(rootBuildContent).doesNotContain("js-preloads")
-            assertThat(moduleBuildContent).doesNotContain("js {")
-            assertThat(moduleBuildContent).contains("wasmJs {")
+            assertThat(sharedBuildContent).contains("wasmJs {")
+            assertThat(sharedBuildContent).contains("browser()")
+            assertThat(sharedBuildContent).doesNotContain("js {")
+            assertThat(webAppBuildContent).contains("implementation(compose.ui)")
+            assertThat(webAppBuildContent).contains("wasmJs {")
         }
     }
 

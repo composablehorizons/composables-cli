@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.jetbrains.compose.hotreload) apply false
     alias(libs.plugins.jetbrains.compose) apply false
     alias(libs.plugins.jetbrains.compose.compiler) apply false
-{{android_root_plugins}}}
+{{android_root_plugins}}
+}
 
 {{web_preload_task_wiring}}
