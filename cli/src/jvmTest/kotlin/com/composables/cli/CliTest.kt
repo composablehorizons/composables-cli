@@ -30,11 +30,13 @@ class CliTest {
             val projectDir = File(targetDir, "newApp")
             val buildFile = File(projectDir, "desktopApp/build.gradle.kts")
             val rootBuildFile = File(projectDir, "build.gradle.kts")
+            val readmeFile = File(projectDir, "README.md")
             val settingsFile = File(projectDir, "settings.gradle.kts")
             val appFile = File(projectDir, "desktopApp/src/commonMain/kotlin/com/composables/demo/App.kt")
 
             assertThat(projectDir.isDirectory, "Generated project directory should exist").isTrue()
             assertThat(buildFile.exists(), "Generated module build file should exist").isTrue()
+            assertThat(readmeFile.exists(), "Generated README should exist").isTrue()
             assertThat(settingsFile.exists(), "Generated settings file should exist").isTrue()
             assertThat(appFile.exists(), "App source should be moved to the requested package").isTrue()
 
@@ -44,6 +46,7 @@ class CliTest {
 
             val buildContent = buildFile.readText()
             val rootBuildContent = rootBuildFile.readText()
+            val readmeContent = readmeFile.readText()
             val settingsContent = settingsFile.readText()
             val appContent = appFile.readText()
 
@@ -63,6 +66,9 @@ class CliTest {
             assertThat(rootBuildContent).doesNotContain("wasm-preloads")
             assertThat(settingsContent).contains("""rootProject.name = "newApp"""")
             assertThat(settingsContent).contains("""include(":desktopApp")""")
+            assertThat(readmeContent).contains("# newApp")
+            assertThat(readmeContent).contains("`./gradlew :desktopApp:run`")
+            assertThat(readmeContent).doesNotContain("wasmJsBrowserDevelopmentRun")
 
             assertThat(appContent).contains("package com.composables.demo")
             assertThat(appContent).contains("Hello Beautiful World!")
@@ -117,6 +123,7 @@ class CliTest {
             val projectDir = File(targetDir, "newApp")
             val rootBuildContent = File(projectDir, "build.gradle.kts").readText()
             val moduleBuildContent = File(projectDir, "composeApp/build.gradle.kts").readText()
+            val readmeContent = File(projectDir, "README.md").readText()
 
             assertThat(rootBuildContent).contains("wasmJsBrowserDistribution")
             assertThat(rootBuildContent).contains("wasm-preloads")
@@ -125,6 +132,9 @@ class CliTest {
             assertThat(rootBuildContent).doesNotContain("js-preloads")
             assertThat(moduleBuildContent).doesNotContain("js {")
             assertThat(moduleBuildContent).contains("wasmJs {")
+            assertThat(readmeContent).contains("# newApp")
+            assertThat(readmeContent).contains("`./gradlew :composeApp:wasmJsBrowserDevelopmentRun`")
+            assertThat(readmeContent).doesNotContain(":composeApp:run")
         }
     }
 
