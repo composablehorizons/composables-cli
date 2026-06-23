@@ -245,7 +245,7 @@ class CliIntegrationTest {
         val content = readme.readText()
         assertThat(content).contains("# ${projectDir.name}")
         assertThat(content).contains("## Run")
-        assertThat(content).contains("`./gradlew :desktopApp:hotRunJvm`")
+        assertThat(content).contains("`./gradlew :desktopApp:hotRunJvm --auto`")
         assertThat(content).doesNotContain(":androidApp:installDebug")
         assertThat(content).doesNotContain("iosApp/iosApp.xcodeproj")
         assertThat(content).doesNotContain(":webApp:wasmJsBrowserDevelopmentRun")
