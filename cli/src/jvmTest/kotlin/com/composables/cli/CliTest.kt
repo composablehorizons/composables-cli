@@ -212,6 +212,18 @@ class CliTest {
     }
 
     @Test
+    fun `buildProjectStartCommand prefers first runnable generated instruction`() {
+        assertThat(buildProjectStartCommand(targets = setOf(JVM, ANDROID, WASM), gradleCommand = "./gradlew"))
+            .isEqualTo("./gradlew :desktopApp:hotRunJvm --auto")
+        assertThat(buildProjectStartCommand(targets = setOf(WASM), gradleCommand = "./gradlew"))
+            .isEqualTo("./gradlew :webApp:wasmJsBrowserDevelopmentRun")
+        assertThat(buildProjectStartCommand(targets = setOf(ANDROID), gradleCommand = "./gradlew"))
+            .isEqualTo("./gradlew :androidApp:installDebug")
+        assertThat(buildProjectStartCommand(targets = setOf(IOS), gradleCommand = "./gradlew"))
+            .isEqualTo("./gradlew build")
+    }
+
+    @Test
     fun `updateRootBuildFile adds missing plugins once`() {
         withTempDir { targetDir ->
             File(targetDir, "build.gradle.kts").writeText(

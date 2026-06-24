@@ -33,11 +33,56 @@ private fun normalizeTargets(targets: Set<String>): LinkedHashSet<String> = link
     addAll(targets)
 }
 
+private data class ProjectInstruction(
+    val label: String,
+    val detail: String? = null,
+    val command: String? = null,
+)
+
+private fun buildProjectInstructions(
+    targets: Set<String>,
+    gradleCommand: String,
+): List<ProjectInstruction> {
+    val normalizedTargets = normalizeTargets(targets)
+    return buildList {
+        if (normalizedTargets.contains(JVM)) {
+            add(ProjectInstruction(label = "JVM", command = "$gradleCommand :$DESKTOP_APP_MODULE:hotRunJvm --auto"))
+        }
+        if (normalizedTargets.contains(ANDROID)) {
+            add(
+                ProjectInstruction(
+                    label = "Android",
+                    detail = "open the project in Android Studio and run the `$ANDROID_APP_MODULE` app on a device or emulator",
+                ),
+            )
+            add(ProjectInstruction(label = "Android install from terminal", command = "$gradleCommand :$ANDROID_APP_MODULE:installDebug"))
+        }
+        if (normalizedTargets.contains(IOS)) {
+            add(
+                ProjectInstruction(
+                    label = "iOS",
+                    detail = "open `$IOS_APP_MODULE/$IOS_APP_MODULE.xcodeproj` in Xcode and run the app on a simulator or device",
+                ),
+            )
+        }
+        if (normalizedTargets.contains(WASM)) {
+            add(ProjectInstruction(label = "Wasm", command = "$gradleCommand :$WEB_APP_MODULE:wasmJsBrowserDevelopmentRun"))
+        }
+    }
+}
+
+internal fun buildProjectStartCommand(
+    targets: Set<String>,
+    gradleCommand: String,
+): String = buildProjectInstructions(
+    targets = targets,
+    gradleCommand = gradleCommand,
+).firstOrNull { it.command != null }?.command ?: "$gradleCommand build"
+
 private fun buildProjectReadme(
     projectName: String,
     targets: Set<String>,
 ): String {
-    val normalizedTargets = normalizeTargets(targets)
     val lines = mutableListOf<String>()
 
     lines += "# $projectName"
@@ -47,18 +92,12 @@ private fun buildProjectReadme(
     lines += "From the project root:"
     lines += ""
 
-    if (normalizedTargets.contains(JVM)) {
-        lines += "- JVM: `./gradlew :$DESKTOP_APP_MODULE:hotRunJvm --auto`"
-    }
-    if (normalizedTargets.contains(ANDROID)) {
-        lines += "- Android: open the project in Android Studio and run the `$ANDROID_APP_MODULE` app on a device or emulator"
-        lines += "- Android install from terminal: `./gradlew :$ANDROID_APP_MODULE:installDebug`"
-    }
-    if (normalizedTargets.contains(IOS)) {
-        lines += "- iOS: open `$IOS_APP_MODULE/$IOS_APP_MODULE.xcodeproj` in Xcode and run the app on a simulator or device"
-    }
-    if (normalizedTargets.contains(WASM)) {
-        lines += "- Wasm: `./gradlew :$WEB_APP_MODULE:wasmJsBrowserDevelopmentRun`"
+    buildProjectInstructions(
+        targets = targets,
+        gradleCommand = "./gradlew",
+    ).forEach { instruction ->
+        val description = instruction.command?.let { "`$it`" } ?: instruction.detail
+        lines += "- ${instruction.label}: $description"
     }
 
     return lines.joinToString("\n") + "\n"
@@ -1374,11 +1413,7 @@ fun cloneGradleProjectAndPrint(
     debugln { "Start by typing:" }
     infoln { "" }
     infoln { "\tcd ${target.absolutePath}" }
-    val startCommand = when {
-        targets.contains(JVM) -> "$gradleScript :$DESKTOP_APP_MODULE:hotRunJvm --auto"
-        targets.contains(WASM) -> "$gradleScript :$WEB_APP_MODULE:wasmJsBrowserDevelopmentRun"
-        else -> "$gradleScript build"
-    }
+    val startCommand = buildProjectStartCommand(targets = targets, gradleCommand = gradleScript)
     infoln { "\t$startCommand" }
     infoln { "" }
     debugln { "Happy coding!" }
