@@ -16,7 +16,58 @@ permissions:
   id-token: write
 
 jobs:
+  verify-generated-project:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            gradle_command: ./gradlew
+          - os: macos-latest
+            gradle_command: ./gradlew
+          - os: windows-latest
+            gradle_command: .\gradlew.bat
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - run: git fetch --tags -f
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          token: ${{ github.token }}
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Run formatting, unit tests, and integration tests
+        run: ${{ matrix.gradle_command }} spotlessCheck test integrationTest --no-daemon
+
+      - name: Check npm package
+        run: ${{ matrix.gradle_command }} npmPackageCheck --no-daemon
+
   prepare:
+    needs: verify-generated-project
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -69,18 +120,18 @@ jobs:
           echo "$CHANGELOG_CONTENT" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v5
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
 
       - name: Cache Gradle packages
         uses: actions/cache@v4
@@ -91,12 +142,6 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
-
-      - name: Run product checks
-        run: ./gradlew spotlessCheck test integrationTest --no-daemon
-
-      - name: Check npm package
-        run: ./gradlew npmPackageCheck --no-daemon
 
       - name: Publish npm package
         run: npm publish cli/build/npm/package --access public
