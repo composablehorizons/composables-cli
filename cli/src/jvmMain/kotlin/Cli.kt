@@ -682,7 +682,13 @@ class Target : CliktCommand("target") {
             hasComposeDependencies(content)
         } ?: return null
 
+        val sharedLikeComposeModules = composeModules.filter { subDir ->
+            File(subDir, "src/commonMain").isDirectory
+        }
+
         when {
+            sharedLikeComposeModules.size == 1 -> return File(sharedLikeComposeModules.first(), "build.gradle.kts")
+            sharedLikeComposeModules.size > 1 -> return selectComposeModule(sharedLikeComposeModules)
             composeModules.isEmpty() -> return null
             composeModules.size == 1 -> return File(composeModules.first(), "build.gradle.kts")
             else -> {

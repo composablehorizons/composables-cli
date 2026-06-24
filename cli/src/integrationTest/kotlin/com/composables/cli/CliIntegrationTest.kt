@@ -4,6 +4,7 @@ import assertk.assertThat
 import assertk.assertions.contains
 import assertk.assertions.doesNotContain
 import assertk.assertions.isEqualTo
+import assertk.assertions.isFalse
 import assertk.assertions.isTrue
 import java.io.File
 import java.nio.file.Files
@@ -91,6 +92,97 @@ class CliIntegrationTest {
 
             val compileResult = runProcess(
                 command = listOf(projectGradleScript(), ":shared:compileKotlinJvm"),
+                workingDir = projectDir,
+                timeoutSeconds = 180,
+            )
+
+            assertThat(compileResult.finished).isTrue()
+            assertThat(compileResult.exitCode).isEqualTo(0)
+            assertThat(compileResult.output).contains("BUILD SUCCESSFUL")
+        } finally {
+            rootDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `cli create-app creates an android-only project`() {
+        val rootDir = Files.createTempDirectory("composables-cli-create-app-android-only").toFile()
+        try {
+            val projectDir = File(rootDir, "sample-app")
+            val launcher = installedLauncher()
+
+            val createResult = runProcess(
+                command = listOf(
+                    launcher.absolutePath,
+                    "create-app",
+                    projectDir.absolutePath,
+                    "--package",
+                    "com.example.sampleapp",
+                    "--app-name",
+                    "Sample App",
+                    "--targets",
+                    "android",
+                ),
+                workingDir = rootDir,
+                timeoutSeconds = 60,
+            )
+
+            assertThat(createResult.finished).isTrue()
+            assertThat(createResult.exitCode).isEqualTo(0)
+            assertThat(createResult.output).contains("Success! Your new Compose app is ready")
+            assertAndroidReadme(projectDir)
+            assertThat(File(projectDir, "shared").isDirectory).isTrue()
+            assertThat(File(projectDir, "androidApp").isDirectory).isTrue()
+            assertThat(File(projectDir, "desktopApp").exists()).isFalse()
+            assertThat(File(projectDir, "iosApp").exists()).isFalse()
+            assertThat(File(projectDir, "webApp").exists()).isFalse()
+
+            val tasksResult = runProcess(
+                command = listOf(projectGradleScript(), "tasks", "--all"),
+                workingDir = projectDir,
+                timeoutSeconds = 180,
+            )
+
+            assertThat(tasksResult.finished).isTrue()
+            assertThat(tasksResult.exitCode).isEqualTo(0)
+            assertThat(tasksResult.output).contains("androidApp:installDebug")
+            assertThat(tasksResult.output).doesNotContain("webApp:wasmJsBrowserDevelopmentRun")
+            assertThat(tasksResult.output).doesNotContain("desktopApp:run")
+        } finally {
+            rootDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `cli create-app creates a wasm-only project that compiles`() {
+        val rootDir = Files.createTempDirectory("composables-cli-create-app-wasm-only").toFile()
+        try {
+            val projectDir = File(rootDir, "sample-app")
+            val launcher = installedLauncher()
+
+            val createResult = runProcess(
+                command = listOf(
+                    launcher.absolutePath,
+                    "create-app",
+                    projectDir.absolutePath,
+                    "--package",
+                    "com.example.sampleapp",
+                    "--app-name",
+                    "Sample App",
+                    "--targets",
+                    "wasm",
+                ),
+                workingDir = rootDir,
+                timeoutSeconds = 60,
+            )
+
+            assertThat(createResult.finished).isTrue()
+            assertThat(createResult.exitCode).isEqualTo(0)
+            assertThat(createResult.output).contains("Success! Your new Compose app is ready")
+            assertWasmReadme(projectDir)
+
+            val compileResult = runProcess(
+                command = listOf(projectGradleScript(), ":shared:compileKotlinWasmJs", ":webApp:compileKotlinWasmJs"),
                 workingDir = projectDir,
                 timeoutSeconds = 180,
             )
@@ -219,6 +311,64 @@ class CliIntegrationTest {
         }
     }
 
+    @Test
+    fun `cli init and target support a custom shared module name`() {
+        val rootDir = Files.createTempDirectory("composables-cli-init-custom-module").toFile()
+        try {
+            val projectDir = File(rootDir, "sample-app")
+            val launcher = installedLauncher()
+
+            val initResult = runProcess(
+                command = listOf(launcher.absolutePath, "init", projectDir.absolutePath),
+                workingDir = rootDir,
+                stdin = "shared-ui\nSample App\ncom.example.sampleapp\nn\ny\nn\nn\n",
+                timeoutSeconds = 60,
+            )
+
+            assertThat(initResult.finished).isTrue()
+            assertThat(initResult.exitCode).isEqualTo(0)
+            assertThat(initResult.output).contains("Shared Module: shared-ui")
+            assertThat(File(projectDir, "shared-ui/build.gradle.kts").exists()).isTrue()
+            assertThat(File(projectDir, "shared").exists()).isFalse()
+
+            val initialCompileResult = runProcess(
+                command = listOf(projectGradleScript(), ":shared-ui:compileKotlinJvm"),
+                workingDir = projectDir,
+                timeoutSeconds = 180,
+            )
+
+            assertThat(initialCompileResult.finished).isTrue()
+            assertThat(initialCompileResult.exitCode).isEqualTo(0)
+            assertThat(initialCompileResult.output).contains("BUILD SUCCESSFUL")
+
+            val targetResult = runProcess(
+                command = listOf(launcher.absolutePath, "target", "wasm"),
+                workingDir = projectDir,
+                timeoutSeconds = 60,
+            )
+
+            assertThat(targetResult.finished).isTrue()
+            assertThat(targetResult.exitCode).isEqualTo(0)
+            assertThat(targetResult.output).contains("Wasm target added successfully!")
+
+            val webAppBuildFile = File(projectDir, "webApp/build.gradle.kts")
+            assertThat(webAppBuildFile.exists()).isTrue()
+            assertThat(webAppBuildFile.readText()).contains("implementation(projects.sharedUi)")
+
+            val wasmCompileResult = runProcess(
+                command = listOf(projectGradleScript(), ":shared-ui:compileKotlinWasmJs", ":webApp:compileKotlinWasmJs"),
+                workingDir = projectDir,
+                timeoutSeconds = 180,
+            )
+
+            assertThat(wasmCompileResult.finished).isTrue()
+            assertThat(wasmCompileResult.exitCode).isEqualTo(0)
+            assertThat(wasmCompileResult.output).contains("BUILD SUCCESSFUL")
+        } finally {
+            rootDir.deleteRecursively()
+        }
+    }
+
     private fun installedLauncher(): File {
         val scriptName = if (System.getProperty("os.name").startsWith("Windows")) "composables.bat" else "composables"
         val launcher = File("build/install/composables/bin/$scriptName")
@@ -249,6 +399,32 @@ class CliIntegrationTest {
         assertThat(content).doesNotContain(":androidApp:installDebug")
         assertThat(content).doesNotContain("iosApp/iosApp.xcodeproj")
         assertThat(content).doesNotContain(":webApp:wasmJsBrowserDevelopmentRun")
+    }
+
+    private fun assertAndroidReadme(projectDir: File) {
+        val readme = File(projectDir, "README.md")
+        assertThat(readme.exists()).isTrue()
+
+        val content = readme.readText()
+        assertThat(content).contains("# ${projectDir.name}")
+        assertThat(content).contains("## Run")
+        assertThat(content).contains("`./gradlew :androidApp:installDebug`")
+        assertThat(content).doesNotContain(":desktopApp:hotRunJvm --auto")
+        assertThat(content).doesNotContain("iosApp/iosApp.xcodeproj")
+        assertThat(content).doesNotContain(":webApp:wasmJsBrowserDevelopmentRun")
+    }
+
+    private fun assertWasmReadme(projectDir: File) {
+        val readme = File(projectDir, "README.md")
+        assertThat(readme.exists()).isTrue()
+
+        val content = readme.readText()
+        assertThat(content).contains("# ${projectDir.name}")
+        assertThat(content).contains("## Run")
+        assertThat(content).contains("`./gradlew :webApp:wasmJsBrowserDevelopmentRun`")
+        assertThat(content).doesNotContain(":androidApp:installDebug")
+        assertThat(content).doesNotContain(":desktopApp:hotRunJvm --auto")
+        assertThat(content).doesNotContain("iosApp/iosApp.xcodeproj")
     }
 
     private fun runProcess(
