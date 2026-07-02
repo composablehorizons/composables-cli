@@ -1174,6 +1174,7 @@ class Target : CliktCommand("target") {
             projectDir = File(workingDir),
             sharedModuleName = moduleName,
             namespace = namespace,
+            appName = File(workingDir).name,
         )
         addModuleIncludeToSettings(workingDir, DESKTOP_APP_MODULE)
         updateRootBuildFile(workingDir, setOf(JVM))
@@ -1288,6 +1289,7 @@ fun MainViewController() = ComposeUIViewController { App() }
         projectDir: File,
         sharedModuleName: String,
         namespace: String,
+        appName: String,
     ) {
         val desktopAppDir = File(projectDir, DESKTOP_APP_MODULE)
         desktopAppDir.mkdirs()
@@ -1303,6 +1305,7 @@ fun MainViewController() = ComposeUIViewController { App() }
         mainFile.writeText(
             object {}.javaClass.getResource("/project/$DESKTOP_APP_MODULE/src/jvmMain/kotlin/org/example/main.kt")!!.readText()
                 .replace("{{namespace}}", namespace)
+                .replace("{{app_name}}", appName)
                 .trim() + "\n",
         )
     }
@@ -2490,6 +2493,7 @@ private fun createModuleGroup(
             appRootDir = appRootDir,
             sharedModuleDependency = sharedModuleDependency,
             namespace = packageName,
+            appName = appName,
             conventions = conventions,
         )
         includedModules += toRelativeModulePath(projectRoot, File(appRootDir, DESKTOP_APP_MODULE))
@@ -2563,6 +2567,7 @@ private fun createDesktopAppModuleInDirectory(
     appRootDir: File,
     sharedModuleDependency: String,
     namespace: String,
+    appName: String,
     conventions: ProjectConventions,
 ) {
     val desktopAppDir = File(appRootDir, DESKTOP_APP_MODULE)
@@ -2582,6 +2587,7 @@ private fun createDesktopAppModuleInDirectory(
     mainFile.writeText(
         object {}.javaClass.getResource("/project/$DESKTOP_APP_MODULE/src/jvmMain/kotlin/org/example/main.kt")!!.readText()
             .replace("{{namespace}}", namespace)
+            .replace("{{app_name}}", appName)
             .trim() + "\n",
     )
 }

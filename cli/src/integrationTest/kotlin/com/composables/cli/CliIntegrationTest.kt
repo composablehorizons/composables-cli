@@ -345,6 +345,7 @@ class CliIntegrationTest {
 
             val sharedBuildFile = File(projectDir, "apps/feature-app/shared/build.gradle.kts").readText()
             val androidAppBuildFile = File(projectDir, "apps/feature-app/androidApp/build.gradle.kts").readText()
+            val desktopMainFile = File(projectDir, "apps/feature-app/desktopApp/src/jvmMain/kotlin/com/example/featureapp/main.kt").readText()
             val webBuildFile = File(projectDir, "apps/feature-app/webApp/build.gradle.kts").readText()
             val webIndexFile = File(projectDir, "apps/feature-app/webApp/src/wasmJsMain/resources/index.html").readText()
             assertThat(sharedBuildFile).contains("alias(libs.plugins.kotlin.multiplatform)")
@@ -355,6 +356,7 @@ class CliIntegrationTest {
             assertThat(sharedBuildFile).contains("minSdk = libs.versions.android.min.sdk.get().toInt()")
             assertThat(sharedBuildFile).contains("implementation(libs.composables.ui)")
             assertThat(androidAppBuildFile).contains("""implementation(project(":apps:feature-app:shared"))""")
+            assertThat(desktopMainFile).contains("""singleWindowApplication(title = "Feature App")""")
             assertThat(webBuildFile).contains("injectWasmPreloads")
             assertThat(webIndexFile).contains("<title>Feature App</title>")
 

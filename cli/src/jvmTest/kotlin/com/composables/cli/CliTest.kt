@@ -51,6 +51,7 @@ class CliTest {
 
             val sharedBuildContent = sharedBuildFile.readText()
             val desktopBuildContent = desktopBuildFile.readText()
+            val desktopMainContent = desktopMainFile.readText()
             val rootBuildContent = rootBuildFile.readText()
             val readmeContent = readmeFile.readText()
             val settingsContent = settingsFile.readText()
@@ -66,6 +67,7 @@ class CliTest {
             assertThat(sharedBuildContent).doesNotContain("{{shared_module_name}}")
             assertThat(desktopBuildContent).contains("implementation(projects.shared)")
             assertThat(desktopBuildContent).contains("mainClass = \"com.composables.demo.MainKt\"")
+            assertThat(desktopMainContent).contains("""singleWindowApplication(title = "The App")""")
 
             assertThat(rootBuildContent).doesNotContain("composeCompatibilityBrowserDistribution")
             assertThat(rootBuildContent).doesNotContain("jsBrowserDistribution")
@@ -118,6 +120,7 @@ class CliTest {
 
             val sharedBuildContent = sharedBuildFile.readText()
             val androidAppBuildContent = androidAppBuildFile.readText()
+            val desktopMainContent = File(projectDir, "desktopApp/src/jvmMain/kotlin/com/composables/demo/main.kt").readText()
             val readmeContent = readmeFile.readText()
             val settingsContent = settingsFile.readText()
 
@@ -133,6 +136,7 @@ class CliTest {
             assertThat(androidAppBuildContent).contains("alias(libs.plugins.android.application)")
             assertThat(androidAppBuildContent).contains("buildFeatures {")
             assertThat(androidAppBuildContent).contains("implementation(projects.sharedUi)")
+            assertThat(desktopMainContent).contains("""singleWindowApplication(title = "The App")""")
             assertThat(settingsContent).contains("""include(":androidApp")""")
             assertThat(settingsContent).contains("""include(":desktopApp")""")
             assertThat(settingsContent).contains("""include(":webApp")""")
