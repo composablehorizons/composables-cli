@@ -39,6 +39,21 @@ private data class ProjectInstruction(
     val command: String? = null,
 )
 
+private data class ProjectConventions(
+    val kotlinMultiplatformPlugin: String,
+    val composePlugin: String,
+    val composeCompilerPlugin: String,
+    val androidApplicationPlugin: String,
+    val androidKotlinMultiplatformLibraryPlugin: String,
+    val usesTypeSafeProjectAccessors: Boolean,
+    val composeUiDependency: String,
+    val composablesUiDependency: String,
+    val androidxActivityComposeDependency: String,
+    val androidCompileSdkExpression: String,
+    val androidMinSdkExpression: String,
+    val androidTargetSdkExpression: String,
+)
+
 private fun buildProjectInstructions(
     targets: Set<String>,
     gradleCommand: String,
@@ -295,16 +310,16 @@ class AddModule : CliktCommand("module") {
         }
 
         val modulePath = toRelativeModulePath(projectRoot, target)
+        val conventions = inferProjectConventions(projectRoot, targets)
         val includedModules = createModuleGroup(
             projectRoot = projectRoot,
             appRootDir = target,
             packageName = resolvedPackageName,
             appName = resolvedAppName,
             targets = targets,
+            conventions = conventions,
         )
         addModuleToSettings(projectRoot, includedModules)
-        updateVersionCatalog(projectRoot.absolutePath, targets)
-        updateRootBuildFile(projectRoot.absolutePath, targets)
 
         infoln { "" }
         infoln { "App Module Configuration:" }
@@ -1681,6 +1696,7 @@ private fun renderProjectTemplate(
     appName: String,
     targets: Set<String>,
     projectName: String = "",
+    conventions: ProjectConventions? = null,
 ): String {
     val normalizedTargets = normalizeTargets(targets)
     val sharedModuleNamespace = toNamespaceSegment(moduleName)
@@ -1689,13 +1705,13 @@ private fun renderProjectTemplate(
         if (normalizedTargets.contains(WASM)) add("import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl")
     }
     val plugins = buildList {
-        add("    alias(libs.plugins.jetbrains.kotlin.multiplatform)")
-        add("    alias(libs.plugins.jetbrains.compose)")
+        add("    alias(${conventions?.kotlinMultiplatformPlugin ?: "libs.plugins.jetbrains.kotlin.multiplatform"})")
+        add("    alias(${conventions?.composePlugin ?: "libs.plugins.jetbrains.compose"})")
         if (!content.contains("libs.plugins.kotlin.compose")) {
-            add("    alias(libs.plugins.jetbrains.compose.compiler)")
+            add("    alias(${conventions?.composeCompilerPlugin ?: "libs.plugins.jetbrains.compose.compiler"})")
         }
         if (normalizedTargets.contains(ANDROID)) {
-            add("    alias(libs.plugins.android.kotlin.multiplatform.library)")
+            add("    alias(${conventions?.androidKotlinMultiplatformLibraryPlugin ?: "libs.plugins.android.kotlin.multiplatform.library"})")
         }
     }
     val kotlinTargets = buildList {
@@ -1703,8 +1719,8 @@ private fun renderProjectTemplate(
             add(
                 """    android {
         namespace = "{{namespace}}.$sharedModuleNamespace"
-        compileSdk = libs.versions.android.compileSdk.get().toInt()
-        minSdk = libs.versions.android.minSdk.get().toInt()
+        compileSdk = ${conventions?.androidCompileSdkExpression ?: "libs.versions.android.compileSdk.get().toInt()"}
+        minSdk = ${conventions?.androidMinSdkExpression ?: "libs.versions.android.minSdk.get().toInt()"}
         withJava()
         androidResources {
             enable = true
@@ -1794,13 +1810,21 @@ android.useAndroidX=true
         "{{imports}}" to if (imports.isNotEmpty()) imports.joinToString("\n") + "\n" else "",
         "{{plugins}}" to "plugins {\n" + plugins.joinToString("\n") + "\n}",
         "{{kotlin_targets}}" to if (kotlinTargets.isNotEmpty()) kotlinTargets.joinToString("\n\n") + "\n" else "",
-        "{{sourcesets}}" to """    sourceSets {
+        "{{sourcesets}}" to if (conventions == null) {
+            """    sourceSets {
         commonMain.dependencies {
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.composables.ui)
         }
-    }""",
-        "{{configuration_blocks}}" to if (normalizedTargets.contains(ANDROID)) {
+    }"""
+        } else {
+            """    sourceSets {
+        commonMain.dependencies {
+            implementation(${conventions.composablesUiDependency})
+        }
+    }"""
+        },
+        "{{configuration_blocks}}" to if (normalizedTargets.contains(ANDROID) && conventions == null) {
             """
 dependencies {
     androidRuntimeClasspath(libs.compose.ui.tooling)
@@ -1886,6 +1910,166 @@ subprojects {
     }
 }
 """.trimIndent()
+
+private fun stripPreviewSupport(content: String): String = content
+    .replace("import androidx.compose.ui.tooling.preview.Preview\n", "")
+    .replace(Regex("""\n@Preview\n@Composable\nfun AppPreview\(\) \{\n    App\(\)\n\}\n?"""), "\n")
+
+private fun inferProjectConventions(projectRoot: File, targets: Set<String>): ProjectConventions {
+    val normalizedTargets = normalizeTargets(targets)
+    val versionCatalog = File(projectRoot, "gradle/libs.versions.toml")
+    if (!versionCatalog.isFile) {
+        throw UsageError("Expected gradle/libs.versions.toml in ${projectRoot.absolutePath}")
+    }
+
+    val versionCatalogContent = versionCatalog.readText()
+    val settingsContent = File(projectRoot, "settings.gradle.kts").takeIf { it.isFile }?.readText().orEmpty()
+    val buildFiles = projectRoot.walkTopDown()
+        .filter { it.isFile && it.name == "build.gradle.kts" }
+        .toList()
+
+    val pluginAccessors = parseVersionCatalogPlugins(versionCatalogContent)
+    val libraryAccessors = parseVersionCatalogLibraries(versionCatalogContent)
+
+    fun pluginAccessor(pluginId: String): String = pluginAccessors[pluginId]
+        ?: throw UsageError("Could not infer plugin alias for $pluginId from gradle/libs.versions.toml")
+
+    fun libraryAccessor(moduleCoordinate: String): String? = libraryAccessors[moduleCoordinate]
+
+    val composeUiDependency = libraryAccessor("org.jetbrains.compose.ui:ui")
+        ?: findDependencyExpression(buildFiles, "libs.compose.ui")
+        ?: throw UsageError("Could not infer a Compose UI dependency accessor from the current project.")
+
+    val composablesUiDependency = findProjectDependencyExpression(buildFiles, ":ui")
+        ?: libraryAccessor("com.composables:ui")
+        ?: findDependencyExpression(buildFiles, "libs.composables.ui")
+        ?: throw UsageError("Could not infer how this project depends on Composables UI. Expected either project(\":ui\") or a com.composables:ui catalog alias.")
+
+    val activityComposeDependency = if (normalizedTargets.contains(ANDROID)) {
+        libraryAccessor("androidx.activity:activity-compose")
+            ?: findDependencyExpression(buildFiles, "libs.androidx.activity.compose")
+            ?: throw UsageError("Could not infer an Android Activity Compose dependency accessor from the current project.")
+    } else {
+        "libs.androidx.activity.compose"
+    }
+
+    val androidCompileSdkExpression = if (normalizedTargets.contains(ANDROID)) {
+        findAssignedExpression(buildFiles, "compileSdk")
+            ?: "libs.versions.android.compileSdk.get().toInt()"
+    } else {
+        "libs.versions.android.compileSdk.get().toInt()"
+    }
+    val androidMinSdkExpression = if (normalizedTargets.contains(ANDROID)) {
+        findAssignedExpression(buildFiles, "minSdk")
+            ?: "libs.versions.android.minSdk.get().toInt()"
+    } else {
+        "libs.versions.android.minSdk.get().toInt()"
+    }
+    val androidTargetSdkExpression = if (normalizedTargets.contains(ANDROID)) {
+        findAssignedExpression(buildFiles, "targetSdk")
+            ?: androidCompileSdkExpression
+    } else {
+        androidCompileSdkExpression
+    }
+
+    return ProjectConventions(
+        kotlinMultiplatformPlugin = pluginAccessor("org.jetbrains.kotlin.multiplatform"),
+        composePlugin = pluginAccessor("org.jetbrains.compose"),
+        composeCompilerPlugin = pluginAccessor("org.jetbrains.kotlin.plugin.compose"),
+        androidApplicationPlugin = if (normalizedTargets.contains(ANDROID)) {
+            pluginAccessor("com.android.application")
+        } else {
+            "libs.plugins.android.application"
+        },
+        androidKotlinMultiplatformLibraryPlugin = if (normalizedTargets.contains(ANDROID)) {
+            pluginAccessor("com.android.kotlin.multiplatform.library")
+        } else {
+            "libs.plugins.android.kotlin.multiplatform.library"
+        },
+        usesTypeSafeProjectAccessors = settingsContent.contains("""enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")"""),
+        composeUiDependency = composeUiDependency,
+        composablesUiDependency = composablesUiDependency,
+        androidxActivityComposeDependency = activityComposeDependency,
+        androidCompileSdkExpression = androidCompileSdkExpression,
+        androidMinSdkExpression = androidMinSdkExpression,
+        androidTargetSdkExpression = androidTargetSdkExpression,
+    )
+}
+
+private fun parseVersionCatalogPlugins(content: String): Map<String, String> {
+    val pluginPattern = Regex("^\\s*([A-Za-z0-9_.-]+)\\s*=\\s*\\{[^}]*id\\s*=\\s*\"([^\"]+)\"")
+    return extractSection(content, "plugins")
+        .lineSequence()
+        .mapNotNull { line ->
+            pluginPattern.find(line)?.let { match ->
+                val alias = match.groupValues[1]
+                val pluginId = match.groupValues[2]
+                pluginId to "libs.plugins.${alias.replace('-', '.')}"
+            }
+        }
+        .toMap()
+}
+
+private fun parseVersionCatalogLibraries(content: String): Map<String, String> {
+    val modulePattern = Regex("^\\s*([A-Za-z0-9_.-]+)\\s*=\\s*\\{[^}]*module\\s*=\\s*\"([^\"]+)\"")
+    val groupNamePattern = Regex("^\\s*([A-Za-z0-9_.-]+)\\s*=\\s*\\{[^}]*group\\s*=\\s*\"([^\"]+)\"[^}]*name\\s*=\\s*\"([^\"]+)\"")
+    return extractSection(content, "libraries")
+        .lineSequence()
+        .mapNotNull { line ->
+            modulePattern.find(line)?.let { match ->
+                val alias = match.groupValues[1]
+                val module = match.groupValues[2]
+                return@mapNotNull module to "libs.${alias.replace('-', '.')}"
+            }
+
+            groupNamePattern.find(line)?.let { match ->
+                val alias = match.groupValues[1]
+                val group = match.groupValues[2]
+                val name = match.groupValues[3]
+                return@mapNotNull "$group:$name" to "libs.${alias.replace('-', '.')}"
+            }
+
+            null
+        }
+        .toMap()
+}
+
+private fun findDependencyExpression(
+    buildFiles: List<File>,
+    accessor: String,
+): String? {
+    val pattern = Regex("""\b(?:implementation|api)\((libs\.[A-Za-z0-9_.]+)\)\s*""")
+    return buildFiles.firstNotNullOfOrNull { file ->
+        pattern.findAll(file.readText())
+            .map { it.groupValues[1] }
+            .firstOrNull { it == accessor }
+    }
+}
+
+private fun findProjectDependencyExpression(
+    buildFiles: List<File>,
+    projectPath: String,
+): String? {
+    val escapedProjectPath = Regex.escape(projectPath)
+    val pattern = Regex("""\b(?:implementation|api)\((project\("$escapedProjectPath"\))\)""")
+    return buildFiles.firstNotNullOfOrNull { file ->
+        pattern.find(file.readText())?.groupValues?.get(1)
+    }
+}
+
+private fun findAssignedExpression(
+    buildFiles: List<File>,
+    propertyName: String,
+): String? {
+    val pattern = Regex("""^\s*$propertyName\s*=\s*(.+)$""", RegexOption.MULTILINE)
+    return buildFiles.firstNotNullOfOrNull { file ->
+        pattern.find(file.readText())
+            ?.groupValues
+            ?.get(1)
+            ?.substringBefore("//")
+            ?.trim()
+    }
+}
 
 fun updateRootBuildFile(
     targetDir: String,
@@ -2151,11 +2335,17 @@ private fun createModuleGroup(
     packageName: String,
     appName: String,
     targets: Set<String>,
+    conventions: ProjectConventions,
 ): List<String> {
     val normalizedTargets = normalizeTargets(targets)
     val sharedModuleDir = File(appRootDir, SHARED_MODULE)
     val sharedModulePath = toRelativeModulePath(projectRoot, sharedModuleDir)
     val sharedModuleAccessor = toProjectAccessorPath(sharedModulePath)
+    val sharedModuleDependency = if (conventions.usesTypeSafeProjectAccessors) {
+        "projects.$sharedModuleAccessor"
+    } else {
+        """project(":${sharedModulePath.replace('/', ':')}")"""
+    }
     val includedModules = mutableListOf(sharedModulePath)
     val resources = listResourceFiles("/project/$SHARED_MODULE")
     resources.forEach { resourcePath ->
@@ -2197,11 +2387,12 @@ private fun createModuleGroup(
             try {
                 val content = file.readText()
                 val updatedContent = renderProjectTemplate(
-                    content = content,
+                    content = stripPreviewSupport(content),
                     packageName = packageName,
                     moduleName = SHARED_MODULE,
                     appName = appName,
                     targets = normalizedTargets,
+                    conventions = conventions,
                 )
                 if (content != updatedContent) {
                     file.writeText(updatedContent)
@@ -2215,9 +2406,10 @@ private fun createModuleGroup(
     if (normalizedTargets.contains(ANDROID)) {
         createAndroidAppModuleInDirectory(
             appRootDir = appRootDir,
-            sharedModuleAccessor = sharedModuleAccessor,
+            sharedModuleDependency = sharedModuleDependency,
             namespace = packageName,
             appName = appName,
+            conventions = conventions,
         )
         includedModules += toRelativeModulePath(projectRoot, File(appRootDir, ANDROID_APP_MODULE))
     }
@@ -2225,8 +2417,9 @@ private fun createModuleGroup(
     if (normalizedTargets.contains(JVM)) {
         createDesktopAppModuleInDirectory(
             appRootDir = appRootDir,
-            sharedModuleAccessor = sharedModuleAccessor,
+            sharedModuleDependency = sharedModuleDependency,
             namespace = packageName,
+            conventions = conventions,
         )
         includedModules += toRelativeModulePath(projectRoot, File(appRootDir, DESKTOP_APP_MODULE))
     }
@@ -2234,8 +2427,9 @@ private fun createModuleGroup(
     if (normalizedTargets.contains(WASM)) {
         createWebAppModuleInDirectory(
             appRootDir = appRootDir,
-            sharedModuleAccessor = sharedModuleAccessor,
+            sharedModuleDependency = sharedModuleDependency,
             namespace = packageName,
+            conventions = conventions,
         )
         includedModules += toRelativeModulePath(projectRoot, File(appRootDir, WEB_APP_MODULE))
     }
@@ -2255,16 +2449,23 @@ private fun createModuleGroup(
 
 private fun createAndroidAppModuleInDirectory(
     appRootDir: File,
-    sharedModuleAccessor: String,
+    sharedModuleDependency: String,
     namespace: String,
     appName: String,
+    conventions: ProjectConventions,
 ) {
     val androidAppDir = File(appRootDir, ANDROID_APP_MODULE)
     androidAppDir.mkdirs()
     File(androidAppDir, "build.gradle.kts").writeText(
         object {}.javaClass.getResource("/project/$ANDROID_APP_MODULE/build.gradle.kts")!!.readText()
-            .replace("{{shared_module_accessor}}", sharedModuleAccessor)
+            .replace("implementation(projects.{{shared_module_accessor}})", "implementation($sharedModuleDependency)")
             .replace("{{namespace}}", namespace)
+            .replace("alias(libs.plugins.android.application)", "alias(${conventions.androidApplicationPlugin})")
+            .replace("alias(libs.plugins.jetbrains.compose.compiler)", "alias(${conventions.composeCompilerPlugin})")
+            .replace("libs.versions.android.compileSdk.get().toInt()", conventions.androidCompileSdkExpression)
+            .replace("libs.versions.android.minSdk.get().toInt()", conventions.androidMinSdkExpression)
+            .replace("libs.versions.android.targetSdk.get().toInt()", conventions.androidTargetSdkExpression)
+            .replace("implementation(libs.androidx.activity.compose)", "implementation(${conventions.androidxActivityComposeDependency})")
             .trim() + "\n",
     )
 
@@ -2288,15 +2489,19 @@ private fun createAndroidAppModuleInDirectory(
 
 private fun createDesktopAppModuleInDirectory(
     appRootDir: File,
-    sharedModuleAccessor: String,
+    sharedModuleDependency: String,
     namespace: String,
+    conventions: ProjectConventions,
 ) {
     val desktopAppDir = File(appRootDir, DESKTOP_APP_MODULE)
     desktopAppDir.mkdirs()
     File(desktopAppDir, "build.gradle.kts").writeText(
         object {}.javaClass.getResource("/project/$DESKTOP_APP_MODULE/build.gradle.kts")!!.readText()
-            .replace("{{shared_module_accessor}}", sharedModuleAccessor)
+            .replace("implementation(projects.{{shared_module_accessor}})", "implementation($sharedModuleDependency)")
             .replace("{{namespace}}", namespace)
+            .replace("alias(libs.plugins.jetbrains.kotlin.multiplatform)", "alias(${conventions.kotlinMultiplatformPlugin})")
+            .replace("alias(libs.plugins.jetbrains.compose)", "alias(${conventions.composePlugin})")
+            .replace("alias(libs.plugins.jetbrains.compose.compiler)", "alias(${conventions.composeCompilerPlugin})")
             .trim() + "\n",
     )
 
@@ -2311,8 +2516,9 @@ private fun createDesktopAppModuleInDirectory(
 
 private fun createWebAppModuleInDirectory(
     appRootDir: File,
-    sharedModuleAccessor: String,
+    sharedModuleDependency: String,
     namespace: String,
+    conventions: ProjectConventions,
 ) {
     val webAppDir = File(appRootDir, WEB_APP_MODULE)
 
@@ -2326,8 +2532,12 @@ private fun createWebAppModuleInDirectory(
         if (targetFile.isFile && targetFile.extension in setOf("kt", "kts", "html", "js", "css")) {
             val content = targetFile.readText()
             val updatedContent = content
-                .replace("{{shared_module_accessor}}", sharedModuleAccessor)
+                .replace("implementation(projects.{{shared_module_accessor}})", "implementation($sharedModuleDependency)")
                 .replace("{{namespace}}", namespace)
+                .replace("alias(libs.plugins.jetbrains.kotlin.multiplatform)", "alias(${conventions.kotlinMultiplatformPlugin})")
+                .replace("alias(libs.plugins.jetbrains.compose)", "alias(${conventions.composePlugin})")
+                .replace("alias(libs.plugins.jetbrains.compose.compiler)", "alias(${conventions.composeCompilerPlugin})")
+                .replace("implementation(libs.compose.ui)", "implementation(${conventions.composeUiDependency})")
             if (content != updatedContent) {
                 targetFile.writeText(updatedContent)
             }

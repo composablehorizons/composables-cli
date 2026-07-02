@@ -297,7 +297,7 @@ class CliIntegrationTest {
                     "--app-name",
                     "Sample App",
                     "--targets",
-                    "jvm",
+                    "android,jvm,wasm",
                 ),
                 workingDir = rootDir,
                 timeoutSeconds = 60,
@@ -305,6 +305,10 @@ class CliIntegrationTest {
 
             assertThat(initResult.finished).isTrue()
             assertThat(initResult.exitCode).isEqualTo(0)
+
+            rewriteProjectToUiStyleConventions(projectDir)
+            val rootBuildBeforeAdd = File(projectDir, "build.gradle.kts").readText()
+            val versionCatalogBeforeAdd = File(projectDir, "gradle/libs.versions.toml").readText()
 
             val addResult = runProcess(
                 command = listOf(
@@ -317,7 +321,7 @@ class CliIntegrationTest {
                     "--app-name",
                     "Feature App",
                     "--targets",
-                    "jvm,wasm",
+                    "android,jvm,wasm",
                 ),
                 workingDir = projectDir,
                 timeoutSeconds = 60,
@@ -327,14 +331,28 @@ class CliIntegrationTest {
             assertThat(addResult.exitCode).isEqualTo(0)
             assertThat(File(projectDir, "apps/feature-app/shared/build.gradle.kts").exists()).isTrue()
             assertThat(File(projectDir, "apps/feature-app/shared/src/commonMain/kotlin/com/example/featureapp/App.kt").exists()).isTrue()
+            assertThat(File(projectDir, "apps/feature-app/androidApp/build.gradle.kts").exists()).isTrue()
             assertThat(File(projectDir, "apps/feature-app/desktopApp/build.gradle.kts").exists()).isTrue()
             assertThat(File(projectDir, "apps/feature-app/webApp/build.gradle.kts").exists()).isTrue()
-            assertThat(File(projectDir, "apps/feature-app/androidApp").exists()).isFalse()
             assertThat(File(projectDir, "apps/feature-app/iosApp").exists()).isFalse()
             val settingsContent = File(projectDir, "settings.gradle.kts").readText()
             assertThat(settingsContent).contains("""include(":apps:feature-app:shared")""")
+            assertThat(settingsContent).contains("""include(":apps:feature-app:androidApp")""")
             assertThat(settingsContent).contains("""include(":apps:feature-app:desktopApp")""")
             assertThat(settingsContent).contains("""include(":apps:feature-app:webApp")""")
+            assertThat(File(projectDir, "build.gradle.kts").readText()).isEqualTo(rootBuildBeforeAdd)
+            assertThat(File(projectDir, "gradle/libs.versions.toml").readText()).isEqualTo(versionCatalogBeforeAdd)
+
+            val sharedBuildFile = File(projectDir, "apps/feature-app/shared/build.gradle.kts").readText()
+            val androidAppBuildFile = File(projectDir, "apps/feature-app/androidApp/build.gradle.kts").readText()
+            assertThat(sharedBuildFile).contains("alias(libs.plugins.kotlin.multiplatform)")
+            assertThat(sharedBuildFile).contains("alias(libs.plugins.compose)")
+            assertThat(sharedBuildFile).contains("alias(libs.plugins.compose.compiler)")
+            assertThat(sharedBuildFile).contains("alias(libs.plugins.android.kotlin.multiplatform.library)")
+            assertThat(sharedBuildFile).contains("compileSdk = libs.versions.android.compile.sdk.get().toInt()")
+            assertThat(sharedBuildFile).contains("minSdk = libs.versions.android.min.sdk.get().toInt()")
+            assertThat(sharedBuildFile).contains("implementation(libs.composables.ui)")
+            assertThat(androidAppBuildFile).contains("""implementation(project(":apps:feature-app:shared"))""")
 
             val compileResult = runProcess(
                 command = listOf(
@@ -354,6 +372,34 @@ class CliIntegrationTest {
         } finally {
             rootDir.deleteRecursively()
         }
+    }
+
+    private fun rewriteProjectToUiStyleConventions(projectDir: File) {
+        val replacements = listOf(
+            "libs.plugins.jetbrains.kotlin.multiplatform" to "libs.plugins.kotlin.multiplatform",
+            "libs.plugins.jetbrains.compose.compiler" to "libs.plugins.compose.compiler",
+            "libs.plugins.jetbrains.compose" to "libs.plugins.compose",
+            "libs.versions.android.compileSdk.get().toInt()" to "libs.versions.android.compile.sdk.get().toInt()",
+            "libs.versions.android.minSdk.get().toInt()" to "libs.versions.android.min.sdk.get().toInt()",
+            "libs.versions.android.targetSdk.get().toInt()" to "libs.versions.android.target.sdk.get().toInt()",
+            "implementation(projects.shared)" to """implementation(project(":shared"))""",
+            "jetbrains-kotlin-multiplatform" to "kotlin-multiplatform",
+            "jetbrains-compose-compiler" to "compose-compiler",
+            "jetbrains-compose" to "compose",
+            "android-compileSdk" to "android-compile-sdk",
+            "android-minSdk" to "android-min-sdk",
+            "android-targetSdk" to "android-target-sdk",
+            "enableFeaturePreview(\"TYPESAFE_PROJECT_ACCESSORS\")\n\n" to "",
+        )
+
+        projectDir.walkTopDown()
+            .filter { it.isFile && (it.extension == "kts" || it.name == "libs.versions.toml") }
+            .forEach { file ->
+                val updated = replacements.fold(file.readText()) { content, (from, to) ->
+                    content.replace(from, to)
+                }
+                file.writeText(updated)
+            }
     }
 
     private fun installedLauncher(): File {
