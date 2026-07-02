@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-02
+
+### Added
+
+- Added `composables add module` to scaffold a new app module group inside an existing Gradle project, including nested
+  `shared`, `desktopApp`, `webApp`, `androidApp`, and `iosApp` modules based on the selected targets.
+
+### Changed
+
+- Renamed the `create-app` command to `init`.
+
 ## [0.7.0] - 2026-06-24
 
 ### Added
