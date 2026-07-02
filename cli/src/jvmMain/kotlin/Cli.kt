@@ -105,7 +105,7 @@ private fun buildProjectReadme(
 
 suspend fun main(args: Array<String>) {
     ComposablesCli()
-        .subcommands(Init(), Target())
+        .subcommands(Init(), Add().subcommands(AddModule()), Target())
         .main(args)
 }
 
@@ -209,6 +209,114 @@ class Init : CliktCommand("init") {
     }
 }
 
+class Add : CliktCommand("add") {
+    override fun help(context: Context): String = """
+        Adds code to an existing Compose project.
+    """.trimIndent()
+
+    override fun run() {
+    }
+}
+
+class AddModule : CliktCommand("module") {
+    override fun help(context: Context): String = """
+        Adds a new Compose app module group to the current Gradle project.
+    """.trimIndent()
+
+    private val path by argument("path", help = "The path to create the new module group in").optional()
+    private val packageName by option("--package", help = "The package name for the generated app module group")
+    private val appName by option("--app-name", help = "The display name for the generated app")
+    private val targetsInput by option("--targets", help = "Comma-separated targets: android,jvm,ios,wasm")
+    private val overwrite by option("--overwrite", help = "Overwrite an existing target directory").flag(default = false)
+
+    override fun run() {
+        val projectRoot = File(System.getProperty("user.dir"))
+        validateExistingGradleProject(projectRoot)
+
+        val kotlinVersion = getKotlinVersion(projectRoot)
+        if (kotlinVersion != null && !isKotlinVersionSupported(kotlinVersion)) {
+            throw UsageError("Kotlin version $kotlinVersion is not supported. At least version 2.4.0 is required.")
+        }
+
+        val anyExplicitInput = path != null || packageName != null || appName != null || targetsInput != null || overwrite
+
+        val target: File
+        val resolvedPackageName: String
+        val resolvedAppName: String
+        val targets: Set<String>
+
+        if (!anyExplicitInput) {
+            try {
+                target = readNewModuleDirectory(projectRoot)
+                resolvedPackageName = readNamespace()
+                resolvedAppName = readAppName()
+                targets = readTargets()
+            } catch (error: RuntimeException) {
+                if (error::class.simpleName == "ReadAfterEOFException" || error.message?.contains("EOF has already been reached") == true) {
+                    throw UsageError(
+                        "Interactive mode requires stdin. Pass <path>, --package, --app-name, and --targets for non-interactive use.",
+                    )
+                }
+                throw error
+            }
+        } else {
+            val missingInputs = buildList {
+                if (path == null) add("<path>")
+                if (packageName == null) add("--package")
+                if (appName == null) add("--app-name")
+                if (targetsInput == null) add("--targets")
+            }
+            if (missingInputs.isNotEmpty()) {
+                throw UsageError("When using add module non-interactively, specify all required inputs. Missing: ${missingInputs.joinToString(", ")}")
+            }
+
+            resolvedPackageName = packageName!!
+            resolvedAppName = appName!!
+
+            if (!isValidPackageName(resolvedPackageName)) {
+                throw UsageError("Invalid package name. Must be a valid Java package name (e.g., com.example.app)")
+            }
+
+            if (!isValidAppName(resolvedAppName)) {
+                throw UsageError("Invalid app name. Must contain at least one letter or digit")
+            }
+
+            targets = try {
+                parseTargets(targetsInput!!)
+            } catch (error: IllegalArgumentException) {
+                throw UsageError(error.message ?: "Invalid targets")
+            }
+
+            target = resolveTargetDirectory(
+                workingDir = projectRoot.absolutePath,
+                projectPath = path!!,
+            )
+            validateModuleTargetDirectory(projectRoot, target, overwrite)
+        }
+
+        val modulePath = toRelativeModulePath(projectRoot, target)
+        val includedModules = createModuleGroup(
+            projectRoot = projectRoot,
+            appRootDir = target,
+            packageName = resolvedPackageName,
+            appName = resolvedAppName,
+            targets = targets,
+        )
+        addModuleToSettings(projectRoot, includedModules)
+        updateVersionCatalog(projectRoot.absolutePath, targets)
+        updateRootBuildFile(projectRoot.absolutePath, targets)
+
+        infoln { "" }
+        infoln { "App Module Configuration:" }
+        infoln { "\tApp Name: $resolvedAppName" }
+        infoln { "\tPackage: $resolvedPackageName" }
+        infoln { "\tModule: $modulePath" }
+        infoln { "\tTargets: ${targets.joinToString(", ")}" }
+        infoln { "" }
+        debugln { "Success! Your new Compose app module group is ready at ${target.absolutePath}" }
+    }
+}
+
 internal fun resolveTargetDirectory(workingDir: String, projectPath: String): File {
     if (projectPath == ".") {
         return File(workingDir)
@@ -243,6 +351,75 @@ internal fun validateInitTargetDirectory(target: File, overwrite: Boolean) {
         }
     }
 }
+
+private fun validateExistingGradleProject(projectRoot: File) {
+    if (!File(projectRoot, "settings.gradle.kts").exists()) {
+        throw UsageError("This command must be run from the root of an existing Gradle project with a settings.gradle.kts file.")
+    }
+}
+
+private fun validateModuleTargetDirectory(
+    projectRoot: File,
+    target: File,
+    overwrite: Boolean,
+) {
+    if (!target.toPath().normalize().startsWith(projectRoot.toPath().normalize())) {
+        throw UsageError("Module path ${target.absolutePath} must be inside the current project.")
+    }
+
+    if (target.toPath().normalize() == projectRoot.toPath().normalize()) {
+        throw UsageError("Module path must point to a subdirectory inside the current project.")
+    }
+
+    val relativePath = projectRoot.toPath().normalize().relativize(target.toPath().normalize())
+    if (relativePath.any { !isValidModuleName(it.toString()) }) {
+        throw UsageError("Invalid module path. Each path segment must start with a letter and contain only letters, digits, hyphens, or underscores")
+    }
+
+    when {
+        target.exists() && overwrite -> {
+            if (!target.deleteRecursively()) {
+                throw UsageError("Failed to overwrite existing directory at ${target.absolutePath}")
+            }
+        }
+
+        target.exists() && target.isFile -> {
+            throw UsageError("Target path ${target.absolutePath} is a file. Choose a different directory or use --overwrite.")
+        }
+
+        target.exists() && target.listFiles()?.isNotEmpty() == true -> {
+            throw UsageError("Target directory ${target.absolutePath} already exists and is not empty. Use --overwrite to replace it.")
+        }
+
+        target.exists() && target.listFiles()?.isEmpty() == true -> {
+            target.deleteRecursively()
+        }
+    }
+}
+
+private fun readNewModuleDirectory(projectRoot: File): File {
+    while (true) {
+        print("Enter module directory: ")
+        val projectPath = readln().trim()
+        if (projectPath.isBlank()) {
+            println("Module directory is required.")
+            continue
+        }
+
+        val target = resolveTargetDirectory(workingDir = projectRoot.absolutePath, projectPath = projectPath)
+        try {
+            validateModuleTargetDirectory(projectRoot, target, overwrite = false)
+            return target
+        } catch (error: UsageError) {
+            println(error.message)
+        }
+    }
+}
+
+private fun toRelativeModulePath(projectRoot: File, target: File): String = projectRoot.toPath()
+    .normalize()
+    .relativize(target.toPath().normalize())
+    .joinToString("/") { it.toString() }
 
 internal fun readNewAppDirectory(workingDir: String): File {
     while (true) {
@@ -418,7 +595,62 @@ private fun toCamelCase(input: String): String = input.split(Regex("[-_]"))
 private fun toProjectAccessorName(input: String): String = toCamelCase(input)
     .replaceFirstChar { if (it.isUpperCase()) it.lowercase() else it.toString() }
 
+private fun toProjectAccessorPath(modulePath: String): String = modulePath
+    .trim(':')
+    .split(':', '/')
+    .filter { it.isNotEmpty() }
+    .joinToString(".") { toProjectAccessorName(it) }
+
 private fun toNamespaceSegment(input: String): String = toProjectAccessorName(input)
+
+private fun listResourceFiles(path: String): List<String> {
+    val resources = mutableListOf<String>()
+    val resourceUrl = object {}.javaClass.getResource(path)
+
+    if (resourceUrl != null) {
+        when (resourceUrl.protocol) {
+            "file" -> {
+                val dir = File(resourceUrl.toURI())
+                dir.walkTopDown().forEach { file ->
+                    if (file.isFile) {
+                        val relativePath = file.relativeTo(dir)
+                        resources.add("$path/${relativePath.toResourcePath()}")
+                    }
+                }
+            }
+
+            "jar" -> {
+                val jarPath = resourceUrl.path.substringBefore("!")
+                val jarFile = JarFile(File(jarPath.substringAfter("file:")))
+                val entries = jarFile.entries()
+
+                while (entries.hasMoreElements()) {
+                    val entry = entries.nextElement()
+                    if (entry.name.startsWith(path.substring(1)) && !entry.isDirectory) {
+                        resources.add("/${entry.name}")
+                    }
+                }
+                jarFile.close()
+            }
+        }
+    }
+
+    return resources
+}
+
+private fun copyBundledResource(resourcePath: String, targetFile: File) {
+    val inputStream: InputStream? = object {}.javaClass.getResourceAsStream(resourcePath)
+    if (inputStream != null) {
+        targetFile.parentFile?.mkdirs()
+        inputStream.use { input ->
+            targetFile.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        }
+    } else {
+        error("Resource not found: $resourcePath")
+    }
+}
 
 class Target : CliktCommand("target") {
     override fun help(context: Context): String = """
@@ -1895,6 +2127,249 @@ private fun updateSection(content: String, sectionName: String, newEntries: List
     }
 
     return lines.joinToString("\n")
+}
+
+private fun addModuleToSettings(
+    projectRoot: File,
+    modulePaths: List<String>,
+) {
+    val settingsFile = File(projectRoot, "settings.gradle.kts")
+    val existingContent = settingsFile.readText()
+    val newStatements = modulePaths
+        .map { ":" + it.split('/').joinToString(":") }
+        .map { """include("$it")""" }
+        .filterNot { existingContent.contains(it) }
+
+    if (newStatements.isEmpty()) return
+
+    settingsFile.writeText(existingContent.trimEnd() + "\n" + newStatements.joinToString("\n") + "\n")
+}
+
+private fun createModuleGroup(
+    projectRoot: File,
+    appRootDir: File,
+    packageName: String,
+    appName: String,
+    targets: Set<String>,
+): List<String> {
+    val normalizedTargets = normalizeTargets(targets)
+    val sharedModuleDir = File(appRootDir, SHARED_MODULE)
+    val sharedModulePath = toRelativeModulePath(projectRoot, sharedModuleDir)
+    val sharedModuleAccessor = toProjectAccessorPath(sharedModulePath)
+    val includedModules = mutableListOf(sharedModulePath)
+    val resources = listResourceFiles("/project/$SHARED_MODULE")
+    resources.forEach { resourcePath ->
+        var targetPath = resourcePath.removePrefix("/project/$SHARED_MODULE/")
+
+        val isInsideAKotlinSourceSet = targetPath.startsWith("src/")
+        if (isInsideAKotlinSourceSet) {
+            val sourceSetType = targetPath.substringAfter("src/").substringBefore("/")
+            when (sourceSetType) {
+                "androidMain" -> if (!normalizedTargets.contains(ANDROID)) return@forEach
+                "iosMain" -> if (!normalizedTargets.contains(IOS)) return@forEach
+                "jvmMain" -> if (!normalizedTargets.contains(JVM)) return@forEach
+                "wasmJsMain" -> if (!normalizedTargets.contains(WASM)) return@forEach
+                "commonMain" -> Unit
+                else -> error("Unknown target: $targetPath")
+            }
+        }
+
+        targetPath = targetPath.replace("org/example/project", packageName.replace(".", "/"))
+        targetPath = targetPath.replace("org/example", packageName.replace(".", "/"))
+
+        val targetFile = sharedModuleDir.resolve(targetPath)
+        copyBundledResource(resourcePath, targetFile)
+    }
+
+    sharedModuleDir.walkTopDown().forEach { file ->
+        if (file.isFile) {
+            if (file.name.endsWith(".jar") ||
+                file.name.endsWith(".png") ||
+                file.name.endsWith(".jpg") ||
+                file.name.endsWith(".jpeg") ||
+                file.name.endsWith(".ico") ||
+                file.name.endsWith(".icns") ||
+                file.name.endsWith(".class")
+            ) {
+                return@forEach
+            }
+
+            try {
+                val content = file.readText()
+                val updatedContent = renderProjectTemplate(
+                    content = content,
+                    packageName = packageName,
+                    moduleName = SHARED_MODULE,
+                    appName = appName,
+                    targets = normalizedTargets,
+                )
+                if (content != updatedContent) {
+                    file.writeText(updatedContent)
+                }
+            } catch (_: Exception) {
+                debugln { "Skipping binary file: ${file.name}" }
+            }
+        }
+    }
+
+    if (normalizedTargets.contains(ANDROID)) {
+        createAndroidAppModuleInDirectory(
+            appRootDir = appRootDir,
+            sharedModuleAccessor = sharedModuleAccessor,
+            namespace = packageName,
+            appName = appName,
+        )
+        includedModules += toRelativeModulePath(projectRoot, File(appRootDir, ANDROID_APP_MODULE))
+    }
+
+    if (normalizedTargets.contains(JVM)) {
+        createDesktopAppModuleInDirectory(
+            appRootDir = appRootDir,
+            sharedModuleAccessor = sharedModuleAccessor,
+            namespace = packageName,
+        )
+        includedModules += toRelativeModulePath(projectRoot, File(appRootDir, DESKTOP_APP_MODULE))
+    }
+
+    if (normalizedTargets.contains(WASM)) {
+        createWebAppModuleInDirectory(
+            appRootDir = appRootDir,
+            sharedModuleAccessor = sharedModuleAccessor,
+            namespace = packageName,
+        )
+        includedModules += toRelativeModulePath(projectRoot, File(appRootDir, WEB_APP_MODULE))
+    }
+
+    if (normalizedTargets.contains(IOS)) {
+        createNestedIosAppDirectory(
+            projectRoot = projectRoot,
+            appRootDir = appRootDir,
+            sharedModulePath = sharedModulePath,
+            namespace = packageName,
+            appName = appName,
+        )
+    }
+
+    return includedModules
+}
+
+private fun createAndroidAppModuleInDirectory(
+    appRootDir: File,
+    sharedModuleAccessor: String,
+    namespace: String,
+    appName: String,
+) {
+    val androidAppDir = File(appRootDir, ANDROID_APP_MODULE)
+    androidAppDir.mkdirs()
+    File(androidAppDir, "build.gradle.kts").writeText(
+        object {}.javaClass.getResource("/project/$ANDROID_APP_MODULE/build.gradle.kts")!!.readText()
+            .replace("{{shared_module_accessor}}", sharedModuleAccessor)
+            .replace("{{namespace}}", namespace)
+            .trim() + "\n",
+    )
+
+    listResourceFiles("/project/$ANDROID_APP_MODULE/src/main").forEach { resourcePath ->
+        val targetPath = resourcePath.removePrefix("/project/$ANDROID_APP_MODULE/src/main/")
+            .replace("org/example/project", namespace.replace(".", "/"))
+        val targetFile = File(androidAppDir, "src/main/$targetPath")
+        copyBundledResource(resourcePath, targetFile)
+
+        if (targetFile.name.endsWith(".kt") || targetFile.name.endsWith(".xml")) {
+            val content = targetFile.readText()
+            val updatedContent = content
+                .replace("{{namespace}}", namespace)
+                .replace("{{app_name}}", appName)
+            if (content != updatedContent) {
+                targetFile.writeText(updatedContent)
+            }
+        }
+    }
+}
+
+private fun createDesktopAppModuleInDirectory(
+    appRootDir: File,
+    sharedModuleAccessor: String,
+    namespace: String,
+) {
+    val desktopAppDir = File(appRootDir, DESKTOP_APP_MODULE)
+    desktopAppDir.mkdirs()
+    File(desktopAppDir, "build.gradle.kts").writeText(
+        object {}.javaClass.getResource("/project/$DESKTOP_APP_MODULE/build.gradle.kts")!!.readText()
+            .replace("{{shared_module_accessor}}", sharedModuleAccessor)
+            .replace("{{namespace}}", namespace)
+            .trim() + "\n",
+    )
+
+    val mainFile = File(desktopAppDir, "src/jvmMain/kotlin/${namespace.replace(".", "/")}/main.kt")
+    mainFile.parentFile.mkdirs()
+    mainFile.writeText(
+        object {}.javaClass.getResource("/project/$DESKTOP_APP_MODULE/src/jvmMain/kotlin/org/example/main.kt")!!.readText()
+            .replace("{{namespace}}", namespace)
+            .trim() + "\n",
+    )
+}
+
+private fun createWebAppModuleInDirectory(
+    appRootDir: File,
+    sharedModuleAccessor: String,
+    namespace: String,
+) {
+    val webAppDir = File(appRootDir, WEB_APP_MODULE)
+
+    listResourceFiles("/project/$WEB_APP_MODULE").forEach { resourcePath ->
+        var targetPath = resourcePath.removePrefix("/project/$WEB_APP_MODULE/")
+        targetPath = targetPath.replace("org/example/project", namespace.replace(".", "/"))
+        targetPath = targetPath.replace("org/example", namespace.replace(".", "/"))
+        val targetFile = webAppDir.resolve(targetPath)
+        copyBundledResource(resourcePath, targetFile)
+
+        if (targetFile.isFile && targetFile.extension in setOf("kt", "kts", "html", "js", "css")) {
+            val content = targetFile.readText()
+            val updatedContent = content
+                .replace("{{shared_module_accessor}}", sharedModuleAccessor)
+                .replace("{{namespace}}", namespace)
+            if (content != updatedContent) {
+                targetFile.writeText(updatedContent)
+            }
+        }
+    }
+}
+
+private fun createNestedIosAppDirectory(
+    projectRoot: File,
+    appRootDir: File,
+    sharedModulePath: String,
+    namespace: String,
+    appName: String,
+) {
+    val iosAppDir = File(appRootDir, IOS_APP_MODULE)
+    val relativeRootPath = buildString {
+        repeat(appRootDir.relativeTo(projectRoot).invariantSeparatorsPath.split('/').size + 1) {
+            append("../")
+        }
+    }.removeSuffix("/")
+    val sharedGradlePath = ":" + sharedModulePath.split('/').joinToString(":")
+
+    listResourceFiles("/project/$IOS_APP_MODULE").forEach { resourcePath ->
+        val targetPath = resourcePath.removePrefix("/project/$IOS_APP_MODULE/")
+        val targetFile = iosAppDir.resolve(targetPath)
+        copyBundledResource(resourcePath, targetFile)
+
+        if (targetFile.isFile && targetFile.extension in setOf("swift", "h", "m", "pbxproj", "xcconfig")) {
+            val content = targetFile.readText()
+            val updatedContent = content
+                .replace("{{module_name}}", sharedGradlePath.removePrefix(":"))
+                .replace("{{ios_binary_name}}", toCamelCase(SHARED_MODULE))
+                .replace("{{target_name}}", "$IOS_APP_MODULE.app")
+                .replace("{{app_name}}", appName)
+                .replace("{{namespace}}", namespace)
+                .replace("""cd "${'$'}SRCROOT/.."""", """cd "${'$'}SRCROOT/$relativeRootPath"""")
+                .replace("./gradlew :{{module_name}}:embedAndSignAppleFrameworkForXcode", "./gradlew $sharedGradlePath:embedAndSignAppleFrameworkForXcode")
+            if (content != updatedContent) {
+                targetFile.writeText(updatedContent)
+            }
+        }
+    }
 }
 
 private fun createIosAppDirectory(

@@ -280,6 +280,82 @@ class CliIntegrationTest {
         }
     }
 
+    @Test
+    fun `cli add module creates a nested app module group that compiles`() {
+        val rootDir = Files.createTempDirectory("composables-cli-add-module").toFile()
+        try {
+            val projectDir = File(rootDir, "sample-app")
+            val launcher = installedLauncher()
+
+            val initResult = runProcess(
+                command = listOf(
+                    launcher.absolutePath,
+                    "init",
+                    projectDir.absolutePath,
+                    "--package",
+                    "com.example.sampleapp",
+                    "--app-name",
+                    "Sample App",
+                    "--targets",
+                    "jvm",
+                ),
+                workingDir = rootDir,
+                timeoutSeconds = 60,
+            )
+
+            assertThat(initResult.finished).isTrue()
+            assertThat(initResult.exitCode).isEqualTo(0)
+
+            val addResult = runProcess(
+                command = listOf(
+                    launcher.absolutePath,
+                    "add",
+                    "module",
+                    "apps/feature-app",
+                    "--package",
+                    "com.example.featureapp",
+                    "--app-name",
+                    "Feature App",
+                    "--targets",
+                    "jvm,wasm",
+                ),
+                workingDir = projectDir,
+                timeoutSeconds = 60,
+            )
+
+            assertThat(addResult.finished).isTrue()
+            assertThat(addResult.exitCode).isEqualTo(0)
+            assertThat(File(projectDir, "apps/feature-app/shared/build.gradle.kts").exists()).isTrue()
+            assertThat(File(projectDir, "apps/feature-app/shared/src/commonMain/kotlin/com/example/featureapp/App.kt").exists()).isTrue()
+            assertThat(File(projectDir, "apps/feature-app/desktopApp/build.gradle.kts").exists()).isTrue()
+            assertThat(File(projectDir, "apps/feature-app/webApp/build.gradle.kts").exists()).isTrue()
+            assertThat(File(projectDir, "apps/feature-app/androidApp").exists()).isFalse()
+            assertThat(File(projectDir, "apps/feature-app/iosApp").exists()).isFalse()
+            val settingsContent = File(projectDir, "settings.gradle.kts").readText()
+            assertThat(settingsContent).contains("""include(":apps:feature-app:shared")""")
+            assertThat(settingsContent).contains("""include(":apps:feature-app:desktopApp")""")
+            assertThat(settingsContent).contains("""include(":apps:feature-app:webApp")""")
+
+            val compileResult = runProcess(
+                command = listOf(
+                    projectGradleScript(),
+                    ":apps:feature-app:shared:compileKotlinJvm",
+                    ":apps:feature-app:shared:compileKotlinWasmJs",
+                    ":apps:feature-app:desktopApp:compileKotlinJvm",
+                    ":apps:feature-app:webApp:compileKotlinWasmJs",
+                ),
+                workingDir = projectDir,
+                timeoutSeconds = 180,
+            )
+
+            assertThat(compileResult.finished).isTrue()
+            assertThat(compileResult.exitCode).isEqualTo(0)
+            assertThat(compileResult.output).contains("BUILD SUCCESSFUL")
+        } finally {
+            rootDir.deleteRecursively()
+        }
+    }
+
     private fun installedLauncher(): File {
         val scriptName = if (System.getProperty("os.name").startsWith("Windows")) "composables.bat" else "composables"
         val launcher = File("build/install/composables/bin/$scriptName")
