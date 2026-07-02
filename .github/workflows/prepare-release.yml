@@ -143,6 +143,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      - name: Build release artifacts
+        run: ./gradlew assembleNpmPackage shadowJar --no-daemon
+
       - name: Publish npm package
         run: npm publish cli/build/npm/package --access public
 
