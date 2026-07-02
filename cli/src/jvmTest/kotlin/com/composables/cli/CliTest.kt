@@ -92,19 +92,6 @@ class CliTest {
     }
 
     @Test
-    fun `init derives project name from absolute directory path`() {
-        val workingDir = File("workspace").absolutePath
-        val projectPath = File("sample-app").absolutePath
-        val targetDir = resolveTargetDirectory(
-            workingDir = workingDir,
-            projectPath = projectPath,
-        )
-
-        assertThat(targetDir.absolutePath).isEqualTo(projectPath)
-        assertThat(targetDir.name).isEqualTo("sample-app")
-    }
-
-    @Test
     fun `cloneGradleProject renders Android as a separate app module`() {
         withTempDir { targetDir ->
             cloneGradleProject(

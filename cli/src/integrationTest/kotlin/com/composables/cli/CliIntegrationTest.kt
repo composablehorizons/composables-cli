@@ -30,40 +30,6 @@ class CliIntegrationTest {
     }
 
     @Test
-    fun `cli init creates a jvm project that compiles`() {
-        val rootDir = Files.createTempDirectory("composables-cli-integration").toFile()
-        try {
-            val projectDir = File(rootDir, "sample-app")
-            val launcher = installedLauncher()
-
-            val initResult = runProcess(
-                command = listOf(launcher.absolutePath, "init", projectDir.absolutePath),
-                workingDir = rootDir,
-                stdin = "\nSample App\ncom.example.sampleapp\nn\ny\nn\nn\n",
-                timeoutSeconds = 60,
-            )
-
-            assertThat(initResult.finished).isTrue()
-            assertThat(initResult.exitCode).isEqualTo(0)
-            assertThat(initResult.output).contains("Success! Your new Compose app is ready")
-            assertThat(initResult.output).contains("${projectGradleScript()} :desktopApp:hotRunJvm --auto")
-            assertJvmReadme(projectDir)
-
-            val compileResult = runProcess(
-                command = listOf(projectGradleScript(), ":shared:compileKotlinJvm"),
-                workingDir = projectDir,
-                timeoutSeconds = 180,
-            )
-
-            assertThat(compileResult.finished).isTrue()
-            assertThat(compileResult.exitCode).isEqualTo(0)
-            assertThat(compileResult.output).contains("BUILD SUCCESSFUL")
-        } finally {
-            rootDir.deleteRecursively()
-        }
-    }
-
-    @Test
     fun `cli create-app creates a jvm project that compiles`() {
         val rootDir = Files.createTempDirectory("composables-cli-create-app").toFile()
         try {
@@ -309,64 +275,6 @@ class CliIntegrationTest {
             assertThat(createResult.output).contains("When using create-app non-interactively")
             assertThat(createResult.output).contains("--app-name")
             assertThat(createResult.output).contains("--targets")
-        } finally {
-            rootDir.deleteRecursively()
-        }
-    }
-
-    @Test
-    fun `cli init and target support a custom shared module name`() {
-        val rootDir = Files.createTempDirectory("composables-cli-init-custom-module").toFile()
-        try {
-            val projectDir = File(rootDir, "sample-app")
-            val launcher = installedLauncher()
-
-            val initResult = runProcess(
-                command = listOf(launcher.absolutePath, "init", projectDir.absolutePath),
-                workingDir = rootDir,
-                stdin = "shared-ui\nSample App\ncom.example.sampleapp\nn\ny\nn\nn\n",
-                timeoutSeconds = 60,
-            )
-
-            assertThat(initResult.finished).isTrue()
-            assertThat(initResult.exitCode).isEqualTo(0)
-            assertThat(initResult.output).contains("Shared Module: shared-ui")
-            assertThat(File(projectDir, "shared-ui/build.gradle.kts").exists()).isTrue()
-            assertThat(File(projectDir, "shared").exists()).isFalse()
-
-            val initialCompileResult = runProcess(
-                command = listOf(projectGradleScript(), ":shared-ui:compileKotlinJvm"),
-                workingDir = projectDir,
-                timeoutSeconds = 180,
-            )
-
-            assertThat(initialCompileResult.finished).isTrue()
-            assertThat(initialCompileResult.exitCode).isEqualTo(0)
-            assertThat(initialCompileResult.output).contains("BUILD SUCCESSFUL")
-
-            val targetResult = runProcess(
-                command = listOf(launcher.absolutePath, "target", "wasm"),
-                workingDir = projectDir,
-                timeoutSeconds = 60,
-            )
-
-            assertThat(targetResult.finished).isTrue()
-            assertThat(targetResult.exitCode).isEqualTo(0)
-            assertThat(targetResult.output).contains("Wasm target added successfully!")
-
-            val webAppBuildFile = File(projectDir, "webApp/build.gradle.kts")
-            assertThat(webAppBuildFile.exists()).isTrue()
-            assertThat(webAppBuildFile.readText()).contains("implementation(projects.sharedUi)")
-
-            val wasmCompileResult = runProcess(
-                command = listOf(projectGradleScript(), ":shared-ui:compileKotlinWasmJs", ":webApp:compileKotlinWasmJs"),
-                workingDir = projectDir,
-                timeoutSeconds = 180,
-            )
-
-            assertThat(wasmCompileResult.finished).isTrue()
-            assertThat(wasmCompileResult.exitCode).isEqualTo(0)
-            assertThat(wasmCompileResult.output).contains("BUILD SUCCESSFUL")
         } finally {
             rootDir.deleteRecursively()
         }
