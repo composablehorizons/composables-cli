@@ -30,8 +30,8 @@ class CliIntegrationTest {
     }
 
     @Test
-    fun `cli create-app creates a jvm project that compiles`() {
-        val rootDir = Files.createTempDirectory("composables-cli-create-app").toFile()
+    fun `cli init creates a jvm project that compiles`() {
+        val rootDir = Files.createTempDirectory("composables-cli-init").toFile()
         try {
             val projectDir = File(rootDir, "sample-app")
             val launcher = installedLauncher()
@@ -39,7 +39,7 @@ class CliIntegrationTest {
             val createResult = runProcess(
                 command = listOf(
                     launcher.absolutePath,
-                    "create-app",
+                    "init",
                     projectDir.absolutePath,
                     "--package",
                     "com.example.sampleapp",
@@ -73,8 +73,8 @@ class CliIntegrationTest {
     }
 
     @Test
-    fun `cli create-app creates an android-only project`() {
-        val rootDir = Files.createTempDirectory("composables-cli-create-app-android-only").toFile()
+    fun `cli init creates an android-only project`() {
+        val rootDir = Files.createTempDirectory("composables-cli-init-android-only").toFile()
         try {
             val projectDir = File(rootDir, "sample-app")
             val launcher = installedLauncher()
@@ -82,7 +82,7 @@ class CliIntegrationTest {
             val createResult = runProcess(
                 command = listOf(
                     launcher.absolutePath,
-                    "create-app",
+                    "init",
                     projectDir.absolutePath,
                     "--package",
                     "com.example.sampleapp",
@@ -122,8 +122,8 @@ class CliIntegrationTest {
     }
 
     @Test
-    fun `cli create-app creates a wasm-only project that compiles`() {
-        val rootDir = Files.createTempDirectory("composables-cli-create-app-wasm-only").toFile()
+    fun `cli init creates a wasm-only project that compiles`() {
+        val rootDir = Files.createTempDirectory("composables-cli-init-wasm-only").toFile()
         try {
             val projectDir = File(rootDir, "sample-app")
             val launcher = installedLauncher()
@@ -131,7 +131,7 @@ class CliIntegrationTest {
             val createResult = runProcess(
                 command = listOf(
                     launcher.absolutePath,
-                    "create-app",
+                    "init",
                     projectDir.absolutePath,
                     "--package",
                     "com.example.sampleapp",
@@ -164,14 +164,14 @@ class CliIntegrationTest {
     }
 
     @Test
-    fun `cli create-app with no args runs interactively and creates a jvm project that compiles`() {
-        val rootDir = Files.createTempDirectory("composables-cli-create-app-interactive").toFile()
+    fun `cli init with no args runs interactively and creates a jvm project that compiles`() {
+        val rootDir = Files.createTempDirectory("composables-cli-init-interactive").toFile()
         try {
             val projectDir = File(rootDir, "sample-app")
             val launcher = installedLauncher()
 
             val createResult = runProcess(
-                command = listOf(launcher.absolutePath, "create-app"),
+                command = listOf(launcher.absolutePath, "init"),
                 workingDir = rootDir,
                 stdin = "sample-app\ncom.example.sampleapp\nSample App\nn\ny\nn\nn\n",
                 timeoutSeconds = 60,
@@ -198,13 +198,13 @@ class CliIntegrationTest {
     }
 
     @Test
-    fun `cli create-app with no args fails cleanly without stdin`() {
-        val rootDir = Files.createTempDirectory("composables-cli-create-app-no-stdin").toFile()
+    fun `cli init with no args fails cleanly without stdin`() {
+        val rootDir = Files.createTempDirectory("composables-cli-init-no-stdin").toFile()
         try {
             val launcher = installedLauncher()
 
             val createResult = runProcess(
-                command = listOf(launcher.absolutePath, "create-app"),
+                command = listOf(launcher.absolutePath, "init"),
                 workingDir = rootDir,
                 timeoutSeconds = 60,
             )
@@ -219,8 +219,8 @@ class CliIntegrationTest {
     }
 
     @Test
-    fun `cli create-app requires overwrite for non-empty directories`() {
-        val rootDir = Files.createTempDirectory("composables-cli-create-app-existing").toFile()
+    fun `cli init requires overwrite for non-empty directories`() {
+        val rootDir = Files.createTempDirectory("composables-cli-init-existing").toFile()
         try {
             val projectDir = File(rootDir, "sample-app").apply {
                 mkdirs()
@@ -231,7 +231,7 @@ class CliIntegrationTest {
             val createResult = runProcess(
                 command = listOf(
                     launcher.absolutePath,
-                    "create-app",
+                    "init",
                     projectDir.absolutePath,
                     "--package",
                     "com.example.sampleapp",
@@ -253,15 +253,15 @@ class CliIntegrationTest {
     }
 
     @Test
-    fun `cli create-app with partial args fails without prompting`() {
-        val rootDir = Files.createTempDirectory("composables-cli-create-app-partial").toFile()
+    fun `cli init with partial args fails without prompting`() {
+        val rootDir = Files.createTempDirectory("composables-cli-init-partial").toFile()
         try {
             val launcher = installedLauncher()
 
             val createResult = runProcess(
                 command = listOf(
                     launcher.absolutePath,
-                    "create-app",
+                    "init",
                     "sample-app",
                     "--package",
                     "com.example.sampleapp",
@@ -272,7 +272,7 @@ class CliIntegrationTest {
 
             assertThat(createResult.finished).isTrue()
             assertThat(createResult.exitCode).isEqualTo(1)
-            assertThat(createResult.output).contains("When using create-app non-interactively")
+            assertThat(createResult.output).contains("When using init non-interactively")
             assertThat(createResult.output).contains("--app-name")
             assertThat(createResult.output).contains("--targets")
         } finally {

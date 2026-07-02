@@ -105,7 +105,7 @@ private fun buildProjectReadme(
 
 suspend fun main(args: Array<String>) {
     ComposablesCli()
-        .subcommands(CreateApp(), Target())
+        .subcommands(Init(), Target())
         .main(args)
 }
 
@@ -127,7 +127,7 @@ class ComposablesCli : CliktCommand(name = "composables") {
     """.trimIndent()
 }
 
-class CreateApp : CliktCommand("create-app") {
+class Init : CliktCommand("init") {
     override fun help(context: Context): String = """
         Creates a new Compose Multiplatform app in the specified <directory> path.
     """.trimIndent()
@@ -169,7 +169,7 @@ class CreateApp : CliktCommand("create-app") {
                 if (targetsInput == null) add("--targets")
             }
             if (missingInputs.isNotEmpty()) {
-                throw UsageError("When using create-app non-interactively, specify all required inputs. Missing: ${missingInputs.joinToString(", ")}")
+                throw UsageError("When using init non-interactively, specify all required inputs. Missing: ${missingInputs.joinToString(", ")}")
             }
 
             resolvedPackageName = packageName!!
@@ -192,7 +192,7 @@ class CreateApp : CliktCommand("create-app") {
                 workingDir = workingDir,
                 projectPath = directory!!,
             )
-            validateCreateAppTargetDirectory(target, overwrite)
+            validateInitTargetDirectory(target, overwrite)
         }
 
         if (!target.exists() && !target.mkdirs()) {
@@ -222,7 +222,7 @@ internal fun resolveTargetDirectory(workingDir: String, projectPath: String): Fi
     }
 }
 
-internal fun validateCreateAppTargetDirectory(target: File, overwrite: Boolean) {
+internal fun validateInitTargetDirectory(target: File, overwrite: Boolean) {
     when {
         target.exists() && overwrite -> {
             if (!target.deleteRecursively()) {
@@ -442,7 +442,7 @@ class Target : CliktCommand("target") {
         if (!isValidComposeAppDirectory(workingDir)) {
             echo("This doesn't appear to be a Compose Multiplatform project.")
             echo("To create a new Compose app, run:")
-            echo("    composables create-app app --package com.example.app --app-name \"My App\" --targets android,jvm,ios,wasm")
+            echo("    composables init app --package com.example.app --app-name \"My App\" --targets android,jvm,ios,wasm")
             return
         }
 
