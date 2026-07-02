@@ -345,6 +345,7 @@ class CliIntegrationTest {
 
             val sharedBuildFile = File(projectDir, "apps/feature-app/shared/build.gradle.kts").readText()
             val androidAppBuildFile = File(projectDir, "apps/feature-app/androidApp/build.gradle.kts").readText()
+            val webIndexFile = File(projectDir, "apps/feature-app/webApp/src/wasmJsMain/resources/index.html").readText()
             assertThat(sharedBuildFile).contains("alias(libs.plugins.kotlin.multiplatform)")
             assertThat(sharedBuildFile).contains("alias(libs.plugins.compose)")
             assertThat(sharedBuildFile).contains("alias(libs.plugins.compose.compiler)")
@@ -353,6 +354,7 @@ class CliIntegrationTest {
             assertThat(sharedBuildFile).contains("minSdk = libs.versions.android.min.sdk.get().toInt()")
             assertThat(sharedBuildFile).contains("implementation(libs.composables.ui)")
             assertThat(androidAppBuildFile).contains("""implementation(project(":apps:feature-app:shared"))""")
+            assertThat(webIndexFile).contains("<title>Feature App</title>")
 
             val compileResult = runProcess(
                 command = listOf(

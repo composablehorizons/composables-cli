@@ -2429,6 +2429,7 @@ private fun createModuleGroup(
             appRootDir = appRootDir,
             sharedModuleDependency = sharedModuleDependency,
             namespace = packageName,
+            appName = appName,
             conventions = conventions,
         )
         includedModules += toRelativeModulePath(projectRoot, File(appRootDir, WEB_APP_MODULE))
@@ -2518,6 +2519,7 @@ private fun createWebAppModuleInDirectory(
     appRootDir: File,
     sharedModuleDependency: String,
     namespace: String,
+    appName: String,
     conventions: ProjectConventions,
 ) {
     val webAppDir = File(appRootDir, WEB_APP_MODULE)
@@ -2534,6 +2536,7 @@ private fun createWebAppModuleInDirectory(
             val updatedContent = content
                 .replace("implementation(projects.{{shared_module_accessor}})", "implementation($sharedModuleDependency)")
                 .replace("{{namespace}}", namespace)
+                .replace("{{app_name}}", appName)
                 .replace("alias(libs.plugins.jetbrains.kotlin.multiplatform)", "alias(${conventions.kotlinMultiplatformPlugin})")
                 .replace("alias(libs.plugins.jetbrains.compose)", "alias(${conventions.composePlugin})")
                 .replace("alias(libs.plugins.jetbrains.compose.compiler)", "alias(${conventions.composeCompilerPlugin})")
