@@ -1,9 +1,11 @@
+import com.android.build.api.dsl.ApplicationExtension
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.compose.compiler)
 }
 
-android {
+extensions.configure<ApplicationExtension> {
     namespace = "{{namespace}}"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
