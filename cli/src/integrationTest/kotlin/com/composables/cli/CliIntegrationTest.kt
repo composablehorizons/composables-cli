@@ -345,6 +345,7 @@ class CliIntegrationTest {
 
             val sharedBuildFile = File(projectDir, "apps/feature-app/shared/build.gradle.kts").readText()
             val androidAppBuildFile = File(projectDir, "apps/feature-app/androidApp/build.gradle.kts").readText()
+            val webBuildFile = File(projectDir, "apps/feature-app/webApp/build.gradle.kts").readText()
             val webIndexFile = File(projectDir, "apps/feature-app/webApp/src/wasmJsMain/resources/index.html").readText()
             assertThat(sharedBuildFile).contains("alias(libs.plugins.kotlin.multiplatform)")
             assertThat(sharedBuildFile).contains("alias(libs.plugins.compose)")
@@ -354,6 +355,7 @@ class CliIntegrationTest {
             assertThat(sharedBuildFile).contains("minSdk = libs.versions.android.min.sdk.get().toInt()")
             assertThat(sharedBuildFile).contains("implementation(libs.composables.ui)")
             assertThat(androidAppBuildFile).contains("""implementation(project(":apps:feature-app:shared"))""")
+            assertThat(webBuildFile).contains("injectWasmPreloads")
             assertThat(webIndexFile).contains("<title>Feature App</title>")
 
             val compileResult = runProcess(
@@ -371,6 +373,21 @@ class CliIntegrationTest {
             assertThat(compileResult.finished).isTrue()
             assertThat(compileResult.exitCode).isEqualTo(0)
             assertThat(compileResult.output).contains("BUILD SUCCESSFUL")
+
+            val distributionResult = runProcess(
+                command = listOf(projectGradleScript(), ":apps:feature-app:webApp:wasmJsBrowserDistribution"),
+                workingDir = projectDir,
+                timeoutSeconds = 180,
+            )
+
+            assertThat(distributionResult.finished).isTrue()
+            assertThat(distributionResult.exitCode).isEqualTo(0)
+            val distributedIndexFile = File(
+                projectDir,
+                "apps/feature-app/webApp/build/dist/wasmJs/productionExecutable/index.html",
+            ).readText()
+            assertThat(distributedIndexFile).contains("<!-- wasm-preloads:start -->")
+            assertThat(distributedIndexFile).contains("""rel="preload"""")
         } finally {
             rootDir.deleteRecursively()
         }

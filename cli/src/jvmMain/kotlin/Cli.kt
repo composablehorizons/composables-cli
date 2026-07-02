@@ -1911,6 +1911,74 @@ subprojects {
 }
 """.trimIndent()
 
+private fun moduleWasmPreloadTaskWiring(): String = """
+fun registerPreloadInjectionTask(
+    distributionTarget: String,
+    markerName: String,
+    includeWasmArtifacts: Boolean,
+) = tasks.run {
+    val taskName = "inject${'$'}{distributionTarget.replaceFirstChar(Char::titlecase)}Preloads"
+    if (taskName in names) {
+        named(taskName)
+    } else {
+        register(taskName) {
+    description = "Injects preload links for generated ${'$'}distributionTarget distribution artifacts."
+    val distributionDir = layout.buildDirectory.dir("dist/${'$'}distributionTarget/productionExecutable")
+    val preloadMarker = markerName
+    val preloadWasmArtifacts = includeWasmArtifacts
+
+    doLast {
+        val distDir = distributionDir.get().asFile
+        val indexFile = distDir.resolve("index.html")
+        if (!indexFile.isFile) return@doLast
+
+        val scriptPreloads = distDir
+            .listFiles { file -> file.isFile && file.extension == "js" }
+            .orEmpty()
+            .sortedBy { it.name }
+            .map { "  <link rel=\"preload\" href=\"${'$'}{it.name}\" as=\"script\">" }
+
+        val artifactPreloads = if (preloadWasmArtifacts) {
+            distDir
+                .listFiles { file -> file.isFile && file.extension == "wasm" }
+                .orEmpty()
+                .sortedBy { it.name }
+                .map {
+                    "  <link rel=\"preload\" href=\"${'$'}{it.name}\" as=\"fetch\" type=\"application/wasm\" crossorigin>"
+                }
+        } else {
+            emptyList()
+        }
+
+        val preloadBlock = (scriptPreloads + artifactPreloads).joinToString(
+            separator = "\n",
+            prefix = "  <!-- ${'$'}preloadMarker:start -->\n",
+            postfix = "\n  <!-- ${'$'}preloadMarker:end -->",
+        )
+
+        val existingPreloadBlock = Regex(
+            pattern = "\\n?  <!-- ${'$'}preloadMarker:start -->.*?  <!-- ${'$'}preloadMarker:end -->\\n?",
+            options = setOf(RegexOption.DOT_MATCHES_ALL),
+        )
+        val indexHtml = indexFile.readText().replace(existingPreloadBlock, "\n")
+        val updatedIndexHtml = indexHtml.replaceFirst("</title>", "</title>\n${'$'}preloadBlock")
+        indexFile.writeText(updatedIndexHtml)
+    }
+}
+    }
+}
+
+val injectWasmPreloads = registerPreloadInjectionTask(
+    distributionTarget = "wasmJs",
+    markerName = "wasm-preloads",
+    includeWasmArtifacts = true,
+)
+
+tasks.matching { it.name == "wasmJsBrowserDistribution" }.configureEach {
+    finalizedBy(injectWasmPreloads)
+}
+""".trimIndent()
+
 private fun stripPreviewSupport(content: String): String = content
     .replace("import androidx.compose.ui.tooling.preview.Preview\n", "")
     .replace(Regex("""\n@Preview\n@Composable\nfun AppPreview\(\) \{\n    App\(\)\n\}\n?"""), "\n")
@@ -2541,8 +2609,16 @@ private fun createWebAppModuleInDirectory(
                 .replace("alias(libs.plugins.jetbrains.compose)", "alias(${conventions.composePlugin})")
                 .replace("alias(libs.plugins.jetbrains.compose.compiler)", "alias(${conventions.composeCompilerPlugin})")
                 .replace("implementation(libs.compose.ui)", "implementation(${conventions.composeUiDependency})")
-            if (content != updatedContent) {
-                targetFile.writeText(updatedContent)
+            val finalContent = if (
+                targetFile.name == "build.gradle.kts" &&
+                !updatedContent.contains("injectWasmPreloads")
+            ) {
+                updatedContent.trimEnd() + "\n\n" + moduleWasmPreloadTaskWiring() + "\n"
+            } else {
+                updatedContent
+            }
+            if (content != finalContent) {
+                targetFile.writeText(finalContent)
             }
         }
     }
