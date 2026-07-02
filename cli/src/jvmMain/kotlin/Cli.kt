@@ -250,7 +250,10 @@ class AddModule : CliktCommand("module") {
 
         val kotlinVersion = getKotlinVersion(projectRoot)
         if (kotlinVersion != null && !isKotlinVersionSupported(kotlinVersion)) {
-            throw UsageError("Kotlin version $kotlinVersion is not supported. At least version 2.4.0 is required.")
+            throw UsageError(
+                "Composables CLI can only be used on projects running Kotlin 2.4.0 and above. " +
+                    "This project uses Kotlin $kotlinVersion. Use a newer version of Kotlin to use the Composables CLI.",
+            )
         }
 
         val anyExplicitInput = path != null || packageName != null || appName != null || targetsInput != null || overwrite
