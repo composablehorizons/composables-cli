@@ -284,7 +284,16 @@ class CliIntegrationTest {
     fun `cli add module creates a nested app module group that compiles`() {
         val rootDir = createTempRoot("composables-cli-add-module")
         try {
-            val projectDir = File(rootDir, "sample-app")
+            val isWindows = System.getProperty("os.name").startsWith("Windows")
+            val projectName = if (isWindows) "s" else "sample-app"
+            val rootPackage = if (isWindows) "c.e.s" else "com.example.sampleapp"
+            val rootAppName = if (isWindows) "S" else "Sample App"
+            val nestedModulePath = if (isWindows) "a/f" else "apps/feature-app"
+            val nestedPackage = if (isWindows) "c.e.f" else "com.example.featureapp"
+            val nestedAppName = if (isWindows) "F" else "Feature App"
+            val nestedPackagePath = nestedPackage.replace(".", "/")
+            val nestedModuleGradlePath = ":" + nestedModulePath.replace('/', ':')
+            val projectDir = File(rootDir, projectName)
             val launcher = installedLauncher()
 
             val initResult = runProcess(
@@ -293,9 +302,9 @@ class CliIntegrationTest {
                     "init",
                     projectDir.absolutePath,
                     "--package",
-                    "com.example.sampleapp",
+                    rootPackage,
                     "--app-name",
-                    "Sample App",
+                    rootAppName,
                     "--targets",
                     "android,jvm,wasm",
                 ),
@@ -315,11 +324,11 @@ class CliIntegrationTest {
                     launcher.absolutePath,
                     "add",
                     "module",
-                    "apps/feature-app",
+                    nestedModulePath,
                     "--package",
-                    "com.example.featureapp",
+                    nestedPackage,
                     "--app-name",
-                    "Feature App",
+                    nestedAppName,
                     "--targets",
                     "android,jvm,wasm",
                 ),
@@ -329,25 +338,26 @@ class CliIntegrationTest {
 
             assertThat(addResult.finished).isTrue()
             assertThat(addResult.exitCode).isEqualTo(0)
-            assertThat(File(projectDir, "apps/feature-app/shared/build.gradle.kts").exists()).isTrue()
-            assertThat(File(projectDir, "apps/feature-app/shared/src/commonMain/kotlin/com/example/featureapp/App.kt").exists()).isTrue()
-            assertThat(File(projectDir, "apps/feature-app/androidApp/build.gradle.kts").exists()).isTrue()
-            assertThat(File(projectDir, "apps/feature-app/desktopApp/build.gradle.kts").exists()).isTrue()
-            assertThat(File(projectDir, "apps/feature-app/webApp/build.gradle.kts").exists()).isTrue()
-            assertThat(File(projectDir, "apps/feature-app/iosApp").exists()).isFalse()
+            val nestedModuleDir = File(projectDir, nestedModulePath)
+            assertThat(File(nestedModuleDir, "shared/build.gradle.kts").exists()).isTrue()
+            assertThat(File(nestedModuleDir, "shared/src/commonMain/kotlin/$nestedPackagePath/App.kt").exists()).isTrue()
+            assertThat(File(nestedModuleDir, "androidApp/build.gradle.kts").exists()).isTrue()
+            assertThat(File(nestedModuleDir, "desktopApp/build.gradle.kts").exists()).isTrue()
+            assertThat(File(nestedModuleDir, "webApp/build.gradle.kts").exists()).isTrue()
+            assertThat(File(nestedModuleDir, "iosApp").exists()).isFalse()
             val settingsContent = File(projectDir, "settings.gradle.kts").readText()
-            assertThat(settingsContent).contains("""include(":apps:feature-app:shared")""")
-            assertThat(settingsContent).contains("""include(":apps:feature-app:androidApp")""")
-            assertThat(settingsContent).contains("""include(":apps:feature-app:desktopApp")""")
-            assertThat(settingsContent).contains("""include(":apps:feature-app:webApp")""")
+            assertThat(settingsContent).contains("""include("$nestedModuleGradlePath:shared")""")
+            assertThat(settingsContent).contains("""include("$nestedModuleGradlePath:androidApp")""")
+            assertThat(settingsContent).contains("""include("$nestedModuleGradlePath:desktopApp")""")
+            assertThat(settingsContent).contains("""include("$nestedModuleGradlePath:webApp")""")
             assertThat(File(projectDir, "build.gradle.kts").readText()).isEqualTo(rootBuildBeforeAdd)
             assertThat(File(projectDir, "gradle/libs.versions.toml").readText()).isEqualTo(versionCatalogBeforeAdd)
 
-            val sharedBuildFile = File(projectDir, "apps/feature-app/shared/build.gradle.kts").readText()
-            val androidAppBuildFile = File(projectDir, "apps/feature-app/androidApp/build.gradle.kts").readText()
-            val desktopMainFile = File(projectDir, "apps/feature-app/desktopApp/src/jvmMain/kotlin/com/example/featureapp/main.kt").readText()
-            val webBuildFile = File(projectDir, "apps/feature-app/webApp/build.gradle.kts").readText()
-            val webIndexFile = File(projectDir, "apps/feature-app/webApp/src/wasmJsMain/resources/index.html").readText()
+            val sharedBuildFile = File(nestedModuleDir, "shared/build.gradle.kts").readText()
+            val androidAppBuildFile = File(nestedModuleDir, "androidApp/build.gradle.kts").readText()
+            val desktopMainFile = File(nestedModuleDir, "desktopApp/src/jvmMain/kotlin/$nestedPackagePath/main.kt").readText()
+            val webBuildFile = File(nestedModuleDir, "webApp/build.gradle.kts").readText()
+            val webIndexFile = File(nestedModuleDir, "webApp/src/wasmJsMain/resources/index.html").readText()
             assertThat(sharedBuildFile).contains("alias(libs.plugins.kotlin.multiplatform)")
             assertThat(sharedBuildFile).contains("alias(libs.plugins.compose)")
             assertThat(sharedBuildFile).contains("alias(libs.plugins.compose.compiler)")
@@ -356,18 +366,18 @@ class CliIntegrationTest {
             assertThat(sharedBuildFile).contains("minSdk = libs.versions.android.min.sdk.get().toInt()")
             assertThat(sharedBuildFile).contains("implementation(libs.composables.ui)")
             assertThat(sharedBuildFile).contains("implementation(libs.composables.uri.painter)")
-            assertThat(androidAppBuildFile).contains("""implementation(project(":apps:feature-app:shared"))""")
-            assertThat(desktopMainFile).contains("""singleWindowApplication(title = "Feature App")""")
+            assertThat(androidAppBuildFile).contains("""implementation(project("$nestedModuleGradlePath:shared"))""")
+            assertThat(desktopMainFile).contains("""singleWindowApplication(title = "$nestedAppName")""")
             assertThat(webBuildFile).contains("injectWasmPreloads")
-            assertThat(webIndexFile).contains("<title>Feature App</title>")
+            assertThat(webIndexFile).contains("<title>$nestedAppName</title>")
 
             val compileResult = runProcess(
                 command = listOf(
                     projectGradleScript(),
-                    ":apps:feature-app:shared:compileKotlinJvm",
-                    ":apps:feature-app:shared:compileKotlinWasmJs",
-                    ":apps:feature-app:desktopApp:compileKotlinJvm",
-                    ":apps:feature-app:webApp:compileKotlinWasmJs",
+                    "$nestedModuleGradlePath:shared:compileKotlinJvm",
+                    "$nestedModuleGradlePath:shared:compileKotlinWasmJs",
+                    "$nestedModuleGradlePath:desktopApp:compileKotlinJvm",
+                    "$nestedModuleGradlePath:webApp:compileKotlinWasmJs",
                 ),
                 workingDir = projectDir,
                 timeoutSeconds = 180,
@@ -378,7 +388,7 @@ class CliIntegrationTest {
             assertThat(compileResult.output).contains("BUILD SUCCESSFUL")
 
             val distributionResult = runProcess(
-                command = listOf(projectGradleScript(), ":apps:feature-app:webApp:wasmJsBrowserDistribution"),
+                command = listOf(projectGradleScript(), "$nestedModuleGradlePath:webApp:wasmJsBrowserDistribution"),
                 workingDir = projectDir,
                 timeoutSeconds = 180,
             )
@@ -387,7 +397,7 @@ class CliIntegrationTest {
             assertThat(distributionResult.exitCode).isEqualTo(0)
             val distributedIndexFile = File(
                 projectDir,
-                "apps/feature-app/webApp/build/dist/wasmJs/productionExecutable/index.html",
+                "$nestedModulePath/webApp/build/dist/wasmJs/productionExecutable/index.html",
             ).readText()
             assertThat(distributedIndexFile).contains("<!-- wasm-preloads:start -->")
             assertThat(distributedIndexFile).contains("""rel="preload"""")
