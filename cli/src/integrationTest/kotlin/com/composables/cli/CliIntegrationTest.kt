@@ -355,6 +355,7 @@ class CliIntegrationTest {
             assertThat(sharedBuildFile).contains("compileSdk = libs.versions.android.compile.sdk.get().toInt()")
             assertThat(sharedBuildFile).contains("minSdk = libs.versions.android.min.sdk.get().toInt()")
             assertThat(sharedBuildFile).contains("implementation(libs.composables.ui)")
+            assertThat(sharedBuildFile).contains("implementation(libs.composables.uri.painter)")
             assertThat(androidAppBuildFile).contains("""implementation(project(":apps:feature-app:shared"))""")
             assertThat(desktopMainFile).contains("""singleWindowApplication(title = "Feature App")""")
             assertThat(webBuildFile).contains("injectWasmPreloads")

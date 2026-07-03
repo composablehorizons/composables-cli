@@ -59,6 +59,7 @@ class CliTest {
 
             assertThat(sharedBuildContent).contains("jvm()")
             assertThat(sharedBuildContent).contains("implementation(libs.composables.ui)")
+            assertThat(sharedBuildContent).contains("implementation(libs.composables.uri.painter)")
             assertThat(sharedBuildContent).contains("implementation(libs.compose.ui.tooling.preview)")
             assertThat(sharedBuildContent).doesNotContain("androidLibrary {")
             assertThat(sharedBuildContent).doesNotContain("android {")
@@ -129,6 +130,7 @@ class CliTest {
             assertThat(sharedBuildContent).doesNotContain("androidLibrary {")
             assertThat(sharedBuildContent).contains("""namespace = "com.composables.demo.sharedUi"""")
             assertThat(sharedBuildContent).contains("androidRuntimeClasspath(libs.compose.ui.tooling)")
+            assertThat(sharedBuildContent).contains("implementation(libs.composables.uri.painter)")
             assertThat(sharedBuildContent).doesNotContain("alias(libs.plugins.android.application)")
             assertThat(sharedBuildContent).doesNotContain("androidMain.dependencies")
             assertThat(sharedBuildContent).doesNotContain("defaultConfig {")
@@ -261,8 +263,10 @@ class CliTest {
             val content = File(targetDir, "gradle/libs.versions.toml").readText()
 
             assertThat(content.countOccurrences("""agp = "9.2.1"""")).isEqualTo(1)
+            assertThat(content.countOccurrences("""iconsLucide = "1.0.0"""")).isEqualTo(1)
             assertThat(content.countOccurrences("""androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }""")).isEqualTo(1)
             assertThat(content.countOccurrences("""composables-ui = { group = "com.composables", name = "ui", version.ref = "composablesUi" }""")).isEqualTo(1)
+            assertThat(content.countOccurrences("""composables-icons-lucide = { group = "com.composables", name = "icons-lucide", version.ref = "iconsLucide" }""")).isEqualTo(1)
             assertThat(content.countOccurrences("""compose-ui = { group = "org.jetbrains.compose.ui", name = "ui", version.ref = "compose" }""")).isEqualTo(1)
             assertThat(content.countOccurrences("""android-application = { id = "com.android.application", version.ref = "agp" }""")).isEqualTo(1)
             assertThat(content.countOccurrences("""android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }""")).isEqualTo(1)

@@ -48,6 +48,8 @@ private data class ProjectConventions(
     val usesTypeSafeProjectAccessors: Boolean,
     val composeUiDependency: String,
     val composablesUiDependency: String,
+    val composablesIconsLucideDependency: String,
+    val composablesUriPainterDependency: String,
     val androidxActivityComposeDependency: String,
     val androidCompileSdkExpression: String,
     val androidMinSdkExpression: String,
@@ -1820,12 +1822,16 @@ android.useAndroidX=true
             """    sourceSets {
         commonMain.dependencies {
             implementation(libs.compose.ui.tooling.preview)
+            implementation(libs.composables.icons.lucide)
+            implementation(libs.composables.uri.painter)
             implementation(libs.composables.ui)
         }
     }"""
         } else {
             """    sourceSets {
         commonMain.dependencies {
+            implementation(${conventions.composablesIconsLucideDependency})
+            implementation(${conventions.composablesUriPainterDependency})
             implementation(${conventions.composablesUiDependency})
         }
     }"""
@@ -2019,6 +2025,14 @@ private fun inferProjectConventions(projectRoot: File, targets: Set<String>): Pr
         ?: findDependencyExpression(buildFiles, "libs.composables.ui")
         ?: throw UsageError("Could not infer how this project depends on Composables UI. Expected either project(\":ui\") or a com.composables:ui catalog alias.")
 
+    val composablesIconsLucideDependency = libraryAccessor("com.composables:icons-lucide")
+        ?: findDependencyExpression(buildFiles, "libs.composables.icons.lucide")
+        ?: "libs.composables.icons.lucide"
+
+    val composablesUriPainterDependency = libraryAccessor("com.composables:compose-uri-painter")
+        ?: findDependencyExpression(buildFiles, "libs.composables.uri.painter")
+        ?: "libs.composables.uri.painter"
+
     val activityComposeDependency = if (normalizedTargets.contains(ANDROID)) {
         libraryAccessor("androidx.activity:activity-compose")
             ?: findDependencyExpression(buildFiles, "libs.androidx.activity.compose")
@@ -2063,6 +2077,8 @@ private fun inferProjectConventions(projectRoot: File, targets: Set<String>): Pr
         usesTypeSafeProjectAccessors = settingsContent.contains("""enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")"""),
         composeUiDependency = composeUiDependency,
         composablesUiDependency = composablesUiDependency,
+        composablesIconsLucideDependency = composablesIconsLucideDependency,
+        composablesUriPainterDependency = composablesUriPainterDependency,
         androidxActivityComposeDependency = activityComposeDependency,
         androidCompileSdkExpression = androidCompileSdkExpression,
         androidMinSdkExpression = androidMinSdkExpression,
@@ -2264,6 +2280,9 @@ fun updateVersionCatalog(
     if (!hasVersionVariable(versionsSection, "composablesUi")) {
         newVersions.add("composablesUi = \"0.1.0\"")
     }
+    if (!hasVersionVariable(versionsSection, "iconsLucide")) {
+        newVersions.add("iconsLucide = \"1.0.0\"")
+    }
 
     // Add Android versions if android target is selected
     if (targets.contains("android")) {
@@ -2273,11 +2292,20 @@ fun updateVersionCatalog(
         if (!hasVersionVariable(versionsSection, "android-targetSdk")) newVersions.add("android-targetSdk = \"37\"")
         if (!hasVersionVariable(versionsSection, "activityCompose")) newVersions.add("activityCompose = \"1.13.0\"")
     }
+    if (!hasVersionVariable(versionsSection, "uriPainter")) {
+        newVersions.add("uriPainter = \"1.0.4\"")
+    }
 
     // Add required libraries if not present
     val newLibraries = mutableListOf<String>()
     if (!hasLibraryVariable(librariesSection, "composables-ui")) {
         newLibraries.add("composables-ui = { group = \"com.composables\", name = \"ui\", version.ref = \"composablesUi\" }")
+    }
+    if (!hasLibraryVariable(librariesSection, "composables-icons-lucide")) {
+        newLibraries.add("composables-icons-lucide = { group = \"com.composables\", name = \"icons-lucide\", version.ref = \"iconsLucide\" }")
+    }
+    if (!hasLibraryVariable(librariesSection, "composables-uri-painter")) {
+        newLibraries.add("composables-uri-painter = { group = \"com.composables\", name = \"compose-uri-painter\", version.ref = \"uriPainter\" }")
     }
     if (!hasLibraryVariable(librariesSection, "compose-ui")) {
         newLibraries.add("compose-ui = { group = \"org.jetbrains.compose.ui\", name = \"ui\", version.ref = \"compose\" }")
