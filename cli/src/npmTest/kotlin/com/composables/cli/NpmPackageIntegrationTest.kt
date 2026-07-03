@@ -13,7 +13,7 @@ class NpmPackageIntegrationTest {
 
     @Test
     fun `published npm package installs and runs`() {
-        val rootDir = Files.createTempDirectory("composables-cli-npm").toFile()
+        val rootDir = createTempRoot("composables-cli-npm")
         try {
             val tarball = npmPackageTarball()
 
@@ -48,6 +48,15 @@ class NpmPackageIntegrationTest {
             "Expected exactly one npm tarball in ${tarballDir.absolutePath}, found ${tarballs.joinToString { it.name }}"
         }
         return tarballs.single()
+    }
+
+    private fun createTempRoot(prefix: String): File {
+        val safePrefix = if (System.getProperty("os.name").startsWith("Windows")) {
+            prefix.take(8)
+        } else {
+            prefix
+        }
+        return Files.createTempDirectory(safePrefix).toFile()
     }
 
     private fun npmInstalledLauncher(rootDir: File): File {

@@ -31,7 +31,7 @@ class CliIntegrationTest {
 
     @Test
     fun `cli init creates a jvm project that compiles`() {
-        val rootDir = Files.createTempDirectory("composables-cli-init").toFile()
+        val rootDir = createTempRoot("composables-cli-init")
         try {
             val projectDir = File(rootDir, "sample-app")
             val launcher = installedLauncher()
@@ -74,7 +74,7 @@ class CliIntegrationTest {
 
     @Test
     fun `cli init creates an android-only project`() {
-        val rootDir = Files.createTempDirectory("composables-cli-init-android-only").toFile()
+        val rootDir = createTempRoot("composables-cli-init-android-only")
         try {
             val projectDir = File(rootDir, "sample-app")
             val launcher = installedLauncher()
@@ -123,7 +123,7 @@ class CliIntegrationTest {
 
     @Test
     fun `cli init creates a wasm-only project that compiles`() {
-        val rootDir = Files.createTempDirectory("composables-cli-init-wasm-only").toFile()
+        val rootDir = createTempRoot("composables-cli-init-wasm-only")
         try {
             val projectDir = File(rootDir, "sample-app")
             val launcher = installedLauncher()
@@ -165,7 +165,7 @@ class CliIntegrationTest {
 
     @Test
     fun `cli init with no args runs interactively and creates a jvm project that compiles`() {
-        val rootDir = Files.createTempDirectory("composables-cli-init-interactive").toFile()
+        val rootDir = createTempRoot("composables-cli-init-interactive")
         try {
             val projectDir = File(rootDir, "sample-app")
             val launcher = installedLauncher()
@@ -199,7 +199,7 @@ class CliIntegrationTest {
 
     @Test
     fun `cli init with no args fails cleanly without stdin`() {
-        val rootDir = Files.createTempDirectory("composables-cli-init-no-stdin").toFile()
+        val rootDir = createTempRoot("composables-cli-init-no-stdin")
         try {
             val launcher = installedLauncher()
 
@@ -220,7 +220,7 @@ class CliIntegrationTest {
 
     @Test
     fun `cli init requires overwrite for non-empty directories`() {
-        val rootDir = Files.createTempDirectory("composables-cli-init-existing").toFile()
+        val rootDir = createTempRoot("composables-cli-init-existing")
         try {
             val projectDir = File(rootDir, "sample-app").apply {
                 mkdirs()
@@ -254,7 +254,7 @@ class CliIntegrationTest {
 
     @Test
     fun `cli init with partial args fails without prompting`() {
-        val rootDir = Files.createTempDirectory("composables-cli-init-partial").toFile()
+        val rootDir = createTempRoot("composables-cli-init-partial")
         try {
             val launcher = installedLauncher()
 
@@ -282,7 +282,7 @@ class CliIntegrationTest {
 
     @Test
     fun `cli add module creates a nested app module group that compiles`() {
-        val rootDir = Files.createTempDirectory("composables-cli-add-module").toFile()
+        val rootDir = createTempRoot("composables-cli-add-module")
         try {
             val projectDir = File(rootDir, "sample-app")
             val launcher = installedLauncher()
@@ -398,7 +398,7 @@ class CliIntegrationTest {
 
     @Test
     fun `rewriteProjectToUiStyleConventions removes type safe project accessors on CRLF settings files`() {
-        val rootDir = Files.createTempDirectory("composables-cli-ui-style-crlf").toFile()
+        val rootDir = createTempRoot("composables-cli-ui-style-crlf")
         try {
             val projectDir = File(rootDir, "sample-app").apply { mkdirs() }
             File(projectDir, "settings.gradle.kts").writeText(
@@ -456,6 +456,15 @@ class CliIntegrationTest {
         val jar = File("build/libs/composables.jar")
         check(jar.isFile) { "Expected shadow jar at ${jar.absolutePath}" }
         return jar
+    }
+
+    private fun createTempRoot(prefix: String): File {
+        val safePrefix = if (System.getProperty("os.name").startsWith("Windows")) {
+            prefix.take(8)
+        } else {
+            prefix
+        }
+        return Files.createTempDirectory(safePrefix).toFile()
     }
 
     private fun projectGradleScript(): String = if (System.getProperty("os.name").startsWith("Windows")) {
