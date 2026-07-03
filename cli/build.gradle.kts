@@ -9,7 +9,7 @@ plugins {
     application
     alias(libs.plugins.jvm)
     alias(libs.plugins.shadow)
-    id("com.github.gmazzo.buildconfig") version "6.0.6"
+    alias(libs.plugins.buildconfig)
 }
 
 val mainClassName = "com.composables.cli.CliKt"
@@ -73,11 +73,11 @@ configurations[npmTestSourceSet.implementationConfigurationName].extendsFrom(con
 configurations[npmTestSourceSet.runtimeOnlyConfigurationName].extendsFrom(configurations.testRuntimeOnly.get())
 
 dependencies {
-    implementation("com.alexstyl:debugln:1.0.3")
-    implementation("com.github.ajalt.clikt:clikt:5.0.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation(libs.debugln)
+    implementation(libs.clikt)
+    implementation(libs.kotlinx.serialization.json)
 
-    testImplementation("com.willowtreeapps.assertk:assertk:0.28.1")
+    testImplementation(libs.assertk)
     testImplementation(kotlin("test"))
 }
 

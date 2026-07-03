@@ -3,10 +3,20 @@ composables-cli = "0.8.1"
 kotlin = "2.2.21"
 shadow = "8.3.8"
 spotless = "7.2.1"
+buildconfig = "6.0.6"
+debugln = "1.0.3"
+clikt = "5.0.3"
+serializationJson = "1.9.0"
+assertk = "0.28.1"
 
 [libraries]
+debugln = { group = "com.alexstyl", name = "debugln", version.ref = "debugln" }
+clikt = { group = "com.github.ajalt.clikt", name = "clikt", version.ref = "clikt" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serializationJson" }
+assertk = { group = "com.willowtreeapps.assertk", name = "assertk", version.ref = "assertk" }
 
 [plugins]
 jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig" }
