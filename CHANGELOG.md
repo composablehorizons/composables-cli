@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-03
+
+### Added
+
+- Added `install --client android-studio` to install the Composables MCP server in Android Studio.
+- Introduced a new `docs` command for quick access to Composables UI docs. The responses come straight from https://composables.com/ui/docs
+
+### Changed
+
+- `add module` now infers host project conventions when wiring new modules into an existing project.
+- Newly generated apps now set the desktop window title from the app name.
+- Newly generated apps now preload Wasm assets in production for faster browser startup.
+- Newly generated apps now include the URI painter dependency by default.
+- Generated Android apps now use the newer AGP application DSL.
+
+### Fixed
+
+- `add module` now sets the generated web app title correctly.
+- `add module` now reports a clearer Kotlin version requirement error for unsupported projects.
+
 ## [0.8.1] - 2026-07-02
 
 ### Fixed
