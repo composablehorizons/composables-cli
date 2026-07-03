@@ -338,6 +338,32 @@ class CliTest {
         }
     }
 
+    @Test
+    fun `docsApiUrl uses the public Composables docs endpoint by default`() {
+        withDocsBaseUrl(null) {
+            assertThat(docsApiUrl("list")).isEqualTo("https://composables.com/api/composables-ui-docs/list")
+        }
+    }
+
+    @Test
+    fun `docsApiUrl respects a custom base url and encodes query parameters`() {
+        withDocsBaseUrl("http://127.0.0.1:8080/") {
+            assertThat(
+                docsApiUrl(
+                    endpoint = "search",
+                    queryParameters = mapOf("q" to "dropdown menu"),
+                ),
+            ).isEqualTo("http://127.0.0.1:8080/api/composables-ui-docs/search?q=dropdown+menu")
+        }
+    }
+
+    @Test
+    fun `docsMarkdownUrl points at the resolved ui docs markdown page`() {
+        withDocsBaseUrl("http://127.0.0.1:8080/") {
+            assertThat(docsMarkdownUrl("buttons")).isEqualTo("http://127.0.0.1:8080/ui/docs/buttons.md")
+        }
+    }
+
     private fun withTempDir(block: (File) -> Unit) {
         val dir = Files.createTempDirectory("composables-cli-test").toFile()
         try {
@@ -354,6 +380,24 @@ class CliTest {
             block()
         } finally {
             System.setProperty("os.name", original)
+        }
+    }
+
+    private fun withDocsBaseUrl(value: String?, block: () -> Unit) {
+        val original = System.getProperty("composables.docs.baseUrl")
+        try {
+            if (value == null) {
+                System.clearProperty("composables.docs.baseUrl")
+            } else {
+                System.setProperty("composables.docs.baseUrl", value)
+            }
+            block()
+        } finally {
+            if (original == null) {
+                System.clearProperty("composables.docs.baseUrl")
+            } else {
+                System.setProperty("composables.docs.baseUrl", original)
+            }
         }
     }
 
