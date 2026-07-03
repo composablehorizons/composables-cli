@@ -7,7 +7,10 @@ import assertk.assertions.exists
 import assertk.assertions.isDirectory
 import assertk.assertions.isEqualTo
 import assertk.assertions.isFalse
+import assertk.assertions.isNotNull
+import assertk.assertions.isNull
 import assertk.assertions.isTrue
+import com.github.ajalt.clikt.core.UsageError
 import java.io.File
 import java.nio.file.Files
 import kotlin.test.Test
@@ -364,6 +367,194 @@ class CliTest {
         }
     }
 
+    @Test
+    fun `mcpUrl points at the hosted mcp endpoint`() {
+        withDocsBaseUrl("http://127.0.0.1:8080/") {
+            assertThat(mcpUrl()).isEqualTo("http://127.0.0.1:8080/mcp")
+        }
+    }
+
+    @Test
+    fun `installAndroidStudioMcpServer creates mcp config when missing`() {
+        withTempDir { targetDir ->
+            val result = installAndroidStudioMcpServer(
+                configDir = targetDir,
+                serverUrl = "https://composables.com/mcp",
+            )
+            val configFile = result.configFile
+
+            assertThat(configFile).exists()
+            assertThat(configFile.readText()).contains(""""composables"""")
+            assertThat(configFile.readText()).contains(""""httpUrl": "https://composables.com/mcp"""")
+            assertThat(result is AndroidStudioMcpInstallResult.Installed).isTrue()
+        }
+    }
+
+    @Test
+    fun `installAndroidStudioMcpServer preserves existing servers`() {
+        withTempDir { targetDir ->
+            val configFile = File(targetDir, "mcp.json").apply {
+                writeText(
+                    """
+                    {
+                      "mcpServers": {
+                        "figma": {
+                          "httpUrl": "https://mcp.figma.com/mcp"
+                        }
+                      }
+                    }
+                    """.trimIndent(),
+                )
+            }
+
+            val result = installAndroidStudioMcpServer(
+                configDir = targetDir,
+                serverUrl = "https://composables.com/mcp",
+            )
+
+            val content = configFile.readText()
+            assertThat(content).contains(""""figma"""")
+            assertThat(content).contains(""""https://mcp.figma.com/mcp"""")
+            assertThat(content).contains(""""composables"""")
+            assertThat(content).contains(""""https://composables.com/mcp"""")
+            assertThat(result is AndroidStudioMcpInstallResult.Installed).isTrue()
+        }
+    }
+
+    @Test
+    fun `installAndroidStudioMcpServer returns already installed when same url exists`() {
+        withTempDir { targetDir ->
+            val configFile = File(targetDir, "mcp.json").apply {
+                writeText(
+                    """
+                    {
+                      "mcpServers": {
+                        "composables": {
+                          "httpUrl": "https://composables.com/mcp"
+                        }
+                      }
+                    }
+                    """.trimIndent(),
+                )
+            }
+
+            val result = installAndroidStudioMcpServer(
+                configDir = targetDir,
+                serverUrl = "https://composables.com/mcp",
+            )
+
+            assertThat(result is AndroidStudioMcpInstallResult.AlreadyInstalled).isTrue()
+            assertThat(configFile.readText()).contains(""""https://composables.com/mcp"""")
+        }
+    }
+
+    @Test
+    fun `installAndroidStudioMcpServer rejects conflicting config without overwrite`() {
+        withTempDir { targetDir ->
+            File(targetDir, "mcp.json").writeText(
+                """
+                {
+                  "mcpServers": {
+                    "composables": {
+                      "httpUrl": "https://example.com/mcp"
+                    }
+                  }
+                }
+                """.trimIndent(),
+            )
+
+            val error = assertFailsWith<UsageError> {
+                installAndroidStudioMcpServer(
+                    configDir = targetDir,
+                    serverUrl = "https://composables.com/mcp",
+                )
+            }
+
+            assertThat(error.message ?: "").contains("Use --overwrite to replace it.")
+        }
+    }
+
+    @Test
+    fun `installAndroidStudioMcpServer overwrites conflicting config when requested`() {
+        withTempDir { targetDir ->
+            val configFile = File(targetDir, "mcp.json").apply {
+                writeText(
+                    """
+                    {
+                      "mcpServers": {
+                        "composables": {
+                          "httpUrl": "https://example.com/mcp"
+                        },
+                        "figma": {
+                          "httpUrl": "https://mcp.figma.com/mcp"
+                        }
+                      }
+                    }
+                    """.trimIndent(),
+                )
+            }
+
+            val result = installAndroidStudioMcpServer(
+                configDir = targetDir,
+                serverUrl = "https://composables.com/mcp",
+                overwrite = true,
+            )
+
+            val content = configFile.readText()
+            assertThat(result is AndroidStudioMcpInstallResult.Installed).isTrue()
+            assertThat(content).contains(""""https://composables.com/mcp"""")
+            assertThat(content).contains(""""figma"""")
+        }
+    }
+
+    @Test
+    fun `installAndroidStudioMcpServer fails cleanly when mcpServers is malformed`() {
+        withTempDir { targetDir ->
+            File(targetDir, "mcp.json").writeText(
+                """
+                {
+                  "mcpServers": []
+                }
+                """.trimIndent(),
+            )
+
+            val error = assertFailsWith<UsageError> {
+                installAndroidStudioMcpServer(
+                    configDir = targetDir,
+                    serverUrl = "https://composables.com/mcp",
+                )
+            }
+
+            assertThat(error.message ?: "").contains("Expected 'mcpServers'")
+        }
+    }
+
+    @Test
+    fun `findAndroidStudioConfigDirectory selects latest mac config directory`() {
+        withTempDir { homeDir ->
+            File(homeDir, "Library/Application Support/Google/AndroidStudio2025.1").mkdirs()
+            val latest = File(homeDir, "Library/Application Support/Google/AndroidStudio2025.2")
+            latest.mkdirs()
+
+            withOsName("Mac OS X") {
+                withUserHome(homeDir.absolutePath) {
+                    assertThat(findAndroidStudioConfigDirectory()).isNotNull().isEqualTo(latest)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `findAndroidStudioConfigDirectory returns null when absent`() {
+        withTempDir { homeDir ->
+            withOsName("Mac OS X") {
+                withUserHome(homeDir.absolutePath) {
+                    assertThat(findAndroidStudioConfigDirectory()).isNull()
+                }
+            }
+        }
+    }
+
     private fun withTempDir(block: (File) -> Unit) {
         val dir = Files.createTempDirectory("composables-cli-test").toFile()
         try {
@@ -398,6 +589,16 @@ class CliTest {
             } else {
                 System.setProperty("composables.docs.baseUrl", original)
             }
+        }
+    }
+
+    private fun withUserHome(value: String, block: () -> Unit) {
+        val original = System.getProperty("user.home")
+        try {
+            System.setProperty("user.home", value)
+            block()
+        } finally {
+            System.setProperty("user.home", original)
         }
     }
 

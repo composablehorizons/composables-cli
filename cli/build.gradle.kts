@@ -75,6 +75,7 @@ configurations[npmTestSourceSet.runtimeOnlyConfigurationName].extendsFrom(config
 dependencies {
     implementation("com.alexstyl:debugln:1.0.3")
     implementation("com.github.ajalt.clikt:clikt:5.0.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
     testImplementation("com.willowtreeapps.assertk:assertk:0.28.1")
     testImplementation(kotlin("test"))
