@@ -12,7 +12,15 @@ import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.options.versionOption
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 import java.io.File
 import java.io.InputStream
 import java.net.URI
@@ -40,6 +48,9 @@ private fun normalizeTargets(targets: Set<String>): LinkedHashSet<String> = link
 }
 
 private val docsHttpClient: HttpClient = HttpClient.newHttpClient()
+private val json = Json {
+    prettyPrint = true
+}
 
 internal fun docsBaseUrl(): String = (
     System.getenv("COMPOSABLES_DOCS_BASE_URL")
@@ -71,6 +82,11 @@ internal fun docsMarkdownUrl(slug: String): String = buildString {
     append("/ui/docs/")
     append(urlEncode(slug.trim()))
     append(".md")
+}
+
+internal fun mcpUrl(): String = buildString {
+    append(docsBaseUrl())
+    append("/mcp")
 }
 
 private fun fetchUrl(url: String): String {
@@ -191,7 +207,7 @@ private fun buildProjectReadme(
 
 suspend fun main(args: Array<String>) {
     ComposablesCli()
-        .subcommands(Init(), Add().subcommands(AddModule()), Docs().subcommands(DocsList(), DocsSearch(), DocsGet()), Target())
+        .subcommands(Init(), Add().subcommands(AddModule()), Docs().subcommands(DocsList(), DocsSearch(), DocsGet()), Install(), Target())
         .main(args)
 }
 
@@ -347,6 +363,39 @@ class DocsGet : CliktCommand("get") {
     }
 }
 
+class Install : CliktCommand("install") {
+    override fun help(context: Context): String = """
+        Installs Composables integrations for supported clients.
+    """.trimIndent()
+
+    private val client by option("--client", help = "Client to install for").required()
+    private val overwrite by option("--overwrite", help = "Overwrite an existing conflicting Composables MCP server entry").flag(default = false)
+
+    override fun run() {
+        when (client.trim().lowercase()) {
+            "android-studio" -> {
+                val configDir = findAndroidStudioConfigDirectory()
+                    ?: throw UsageError(
+                        "Could not find an Android Studio configuration directory. Open Android Studio at least once before running this command.",
+                    )
+                when (val result = installAndroidStudioMcpServer(configDir, serverUrl = mcpUrl(), overwrite = overwrite)) {
+                    is AndroidStudioMcpInstallResult.AlreadyInstalled -> {
+                        echo("Composables MCP is already installed for Android Studio.")
+                        echo("Using ${result.configFile.absolutePath}")
+                    }
+
+                    is AndroidStudioMcpInstallResult.Installed -> {
+                        echo("Installed Composables MCP for Android Studio.")
+                        echo("Updated ${result.configFile.absolutePath}")
+                    }
+                }
+            }
+
+            else -> throw UsageError("Unsupported client '$client'. Available clients: android-studio")
+        }
+    }
+}
+
 class AddModule : CliktCommand("module") {
     override fun help(context: Context): String = """
         Adds a new Compose app module group to the current Gradle project.
@@ -461,6 +510,156 @@ internal fun resolveTargetDirectory(workingDir: String, projectPath: String): Fi
         File(workingDir).resolve(projectPath)
     }
 }
+
+internal sealed interface AndroidStudioMcpInstallResult {
+    val configFile: File
+
+    data class Installed(override val configFile: File) : AndroidStudioMcpInstallResult
+
+    data class AlreadyInstalled(override val configFile: File) : AndroidStudioMcpInstallResult
+}
+
+internal fun installAndroidStudioMcpServer(
+    configDir: File,
+    serverUrl: String,
+    serverName: String = "composables",
+    overwrite: Boolean = false,
+): AndroidStudioMcpInstallResult {
+    if (!configDir.exists() && !configDir.mkdirs()) {
+        throw UsageError("Failed to create Android Studio config directory at ${configDir.absolutePath}")
+    }
+    if (!configDir.isDirectory) {
+        throw UsageError("Android Studio config path ${configDir.absolutePath} is not a directory.")
+    }
+
+    val mcpConfigFile = File(configDir, "mcp.json")
+    val existingRoot = readJsonObjectOrEmpty(mcpConfigFile)
+    val existingServers = readNestedJsonObject(existingRoot, "mcpServers", mcpConfigFile) ?: JsonObject(emptyMap())
+    val existingServer = existingServers[serverName]?.jsonObject
+    val existingUrl = existingServer?.get("httpUrl")?.let { element ->
+        (element as? JsonPrimitive)?.contentOrNull?.trim()
+    }
+
+    if (existingUrl == serverUrl) {
+        return AndroidStudioMcpInstallResult.AlreadyInstalled(mcpConfigFile)
+    }
+    if (existingServer != null && !overwrite) {
+        val configuredUrl = existingUrl ?: "an unsupported configuration"
+        throw UsageError(
+            "Android Studio already has a '$serverName' MCP server configured with $configuredUrl. " +
+                "Use --overwrite to replace it.",
+        )
+    }
+
+    val updatedServers = buildJsonObject {
+        existingServers.forEach { (key, value) ->
+            put(key, value)
+        }
+        put(
+            serverName,
+            buildJsonObject {
+                put("httpUrl", JsonPrimitive(serverUrl))
+            },
+        )
+    }
+    val updatedRoot = buildJsonObject {
+        existingRoot.forEach { (key, value) ->
+            if (key != "mcpServers") {
+                put(key, value)
+            }
+        }
+        put("mcpServers", updatedServers)
+    }
+    mcpConfigFile.writeText(json.encodeToString(JsonObject.serializer(), updatedRoot) + "\n")
+    return AndroidStudioMcpInstallResult.Installed(mcpConfigFile)
+}
+
+internal fun findAndroidStudioConfigDirectory(): File? {
+    val override = System.getProperty("composables.androidStudio.configDir")?.trim().orEmpty()
+    if (override.isNotEmpty()) {
+        return File(override)
+    }
+
+    val homeDir = File(System.getProperty("user.home"))
+    val candidates = when {
+        isWindows() -> listOfNotNull(
+            System.getenv("APPDATA")?.takeIf { it.isNotBlank() }?.let { File(it, "Google") },
+        )
+        isMacOs() -> listOf(File(homeDir, "Library/Application Support/Google"))
+        else -> listOf(File(homeDir, ".config/Google"))
+    }
+
+    return candidates
+        .asSequence()
+        .filter { it.isDirectory }
+        .flatMap { baseDir ->
+            baseDir.listFiles()
+                .orEmpty()
+                .asSequence()
+                .filter { it.isDirectory && (it.name.startsWith("AndroidStudio") || it.name.startsWith("AndroidStudioPreview")) }
+        }
+        .maxWithOrNull { left, right ->
+            compareAndroidStudioVersions(left.name, right.name)
+                .takeIf { it != 0 }
+                ?: left.name.compareTo(right.name)
+        }
+}
+
+private fun readJsonObjectOrEmpty(file: File): JsonObject {
+    if (!file.exists()) {
+        return JsonObject(emptyMap())
+    }
+
+    val content = file.readText().trim()
+    if (content.isEmpty()) {
+        return JsonObject(emptyMap())
+    }
+
+    val element = try {
+        json.parseToJsonElement(content)
+    } catch (error: Exception) {
+        throw UsageError("Failed to read ${file.absolutePath}: ${error.message}")
+    }
+
+    return element as? JsonObject
+        ?: throw UsageError("Expected ${file.absolutePath} to contain a JSON object.")
+}
+
+private fun readNestedJsonObject(root: JsonObject, key: String, sourceFile: File): JsonObject? {
+    val value = root[key] ?: return null
+    return value as? JsonObject
+        ?: throw UsageError("Expected '$key' in ${sourceFile.absolutePath} to be a JSON object.")
+}
+
+private fun parseAndroidStudioVersion(name: String): List<Int> {
+    val version = name
+        .removePrefix("AndroidStudioPreview")
+        .removePrefix("AndroidStudio")
+        .split('.')
+        .mapNotNull { part -> part.toIntOrNull() }
+
+    return if (version.isEmpty()) listOf(0) else version
+}
+
+private fun compareAndroidStudioVersions(left: String, right: String): Int {
+    val leftParts = parseAndroidStudioVersion(left)
+    val rightParts = parseAndroidStudioVersion(right)
+    val maxSize = maxOf(leftParts.size, rightParts.size)
+
+    for (index in 0 until maxSize) {
+        val leftPart = leftParts.getOrElse(index) { 0 }
+        val rightPart = rightParts.getOrElse(index) { 0 }
+        if (leftPart != rightPart) {
+            return leftPart.compareTo(rightPart)
+        }
+    }
+
+    return 0
+}
+
+private fun isMacOs(): Boolean = System.getProperty("os.name").contains("Mac", ignoreCase = true)
+
+private fun isWindows(): Boolean = System.getProperty("os.name").contains("Windows", ignoreCase = true)
 
 internal fun validateInitTargetDirectory(target: File, overwrite: Boolean) {
     when {
