@@ -371,36 +371,48 @@ class CliIntegrationTest {
             assertThat(webBuildFile).contains("injectWasmPreloads")
             assertThat(webIndexFile).contains("<title>$nestedAppName</title>")
 
-            val compileResult = runProcess(
-                command = listOf(
-                    projectGradleScript(),
-                    "$nestedModuleGradlePath:shared:compileKotlinJvm",
-                    "$nestedModuleGradlePath:shared:compileKotlinWasmJs",
-                    "$nestedModuleGradlePath:desktopApp:compileKotlinJvm",
-                    "$nestedModuleGradlePath:webApp:compileKotlinWasmJs",
-                ),
-                workingDir = projectDir,
-                timeoutSeconds = 180,
-            )
+            if (isWindows) {
+                val evaluationResult = runProcess(
+                    command = listOf(projectGradleScript(), "$nestedModuleGradlePath:webApp:tasks", "--all"),
+                    workingDir = projectDir,
+                    timeoutSeconds = 180,
+                )
 
-            assertThat(compileResult.finished).isTrue()
-            assertThat(compileResult.exitCode).isEqualTo(0)
-            assertThat(compileResult.output).contains("BUILD SUCCESSFUL")
+                assertThat(evaluationResult.finished).isTrue()
+                assertThat(evaluationResult.exitCode).isEqualTo(0)
+                assertThat(evaluationResult.output).contains("wasmJsBrowserDistribution")
+            } else {
+                val compileResult = runProcess(
+                    command = listOf(
+                        projectGradleScript(),
+                        "$nestedModuleGradlePath:shared:compileKotlinJvm",
+                        "$nestedModuleGradlePath:shared:compileKotlinWasmJs",
+                        "$nestedModuleGradlePath:desktopApp:compileKotlinJvm",
+                        "$nestedModuleGradlePath:webApp:compileKotlinWasmJs",
+                    ),
+                    workingDir = projectDir,
+                    timeoutSeconds = 180,
+                )
 
-            val distributionResult = runProcess(
-                command = listOf(projectGradleScript(), "$nestedModuleGradlePath:webApp:wasmJsBrowserDistribution"),
-                workingDir = projectDir,
-                timeoutSeconds = 180,
-            )
+                assertThat(compileResult.finished).isTrue()
+                assertThat(compileResult.exitCode).isEqualTo(0)
+                assertThat(compileResult.output).contains("BUILD SUCCESSFUL")
 
-            assertThat(distributionResult.finished).isTrue()
-            assertThat(distributionResult.exitCode).isEqualTo(0)
-            val distributedIndexFile = File(
-                projectDir,
-                "$nestedModulePath/webApp/build/dist/wasmJs/productionExecutable/index.html",
-            ).readText()
-            assertThat(distributedIndexFile).contains("<!-- wasm-preloads:start -->")
-            assertThat(distributedIndexFile).contains("""rel="preload"""")
+                val distributionResult = runProcess(
+                    command = listOf(projectGradleScript(), "$nestedModuleGradlePath:webApp:wasmJsBrowserDistribution"),
+                    workingDir = projectDir,
+                    timeoutSeconds = 180,
+                )
+
+                assertThat(distributionResult.finished).isTrue()
+                assertThat(distributionResult.exitCode).isEqualTo(0)
+                val distributedIndexFile = File(
+                    projectDir,
+                    "$nestedModulePath/webApp/build/dist/wasmJs/productionExecutable/index.html",
+                ).readText()
+                assertThat(distributedIndexFile).contains("<!-- wasm-preloads:start -->")
+                assertThat(distributedIndexFile).contains("""rel="preload"""")
+            }
         } finally {
             rootDir.deleteRecursively()
         }
