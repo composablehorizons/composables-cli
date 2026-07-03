@@ -396,6 +396,24 @@ class CliIntegrationTest {
         }
     }
 
+    @Test
+    fun `rewriteProjectToUiStyleConventions removes type safe project accessors on CRLF settings files`() {
+        val rootDir = Files.createTempDirectory("composables-cli-ui-style-crlf").toFile()
+        try {
+            val projectDir = File(rootDir, "sample-app").apply { mkdirs() }
+            File(projectDir, "settings.gradle.kts").writeText(
+                "rootProject.name = \"sample-app\"\r\n\r\nenableFeaturePreview(\"TYPESAFE_PROJECT_ACCESSORS\")\r\n\r\ninclude(\":shared\")\r\n",
+            )
+
+            rewriteProjectToUiStyleConventions(projectDir)
+
+            val rewritten = File(projectDir, "settings.gradle.kts").readText()
+            assertThat(rewritten).doesNotContain("enableFeaturePreview(\"TYPESAFE_PROJECT_ACCESSORS\")")
+        } finally {
+            rootDir.deleteRecursively()
+        }
+    }
+
     private fun rewriteProjectToUiStyleConventions(projectDir: File) {
         val replacements = listOf(
             "libs.plugins.jetbrains.kotlin.multiplatform" to "libs.plugins.kotlin.multiplatform",
@@ -411,7 +429,6 @@ class CliIntegrationTest {
             "android-compileSdk" to "android-compile-sdk",
             "android-minSdk" to "android-min-sdk",
             "android-targetSdk" to "android-target-sdk",
-            "enableFeaturePreview(\"TYPESAFE_PROJECT_ACCESSORS\")\n\n" to "",
         )
 
         projectDir.walkTopDown()
@@ -420,7 +437,11 @@ class CliIntegrationTest {
                 val updated = replacements.fold(file.readText()) { content, (from, to) ->
                     content.replace(from, to)
                 }
-                file.writeText(updated)
+                val normalized = updated.replace(
+                    Regex("""enableFeaturePreview\("TYPESAFE_PROJECT_ACCESSORS"\)\r?\n(?:\r?\n)?"""),
+                    "",
+                )
+                file.writeText(normalized)
             }
     }
 
