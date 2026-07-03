@@ -15,6 +15,12 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.versionOption
 import java.io.File
 import java.io.InputStream
+import java.net.URI
+import java.net.URLEncoder
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.nio.charset.StandardCharsets
 import java.util.jar.JarFile
 
 val ANDROID = "android"
@@ -32,6 +38,69 @@ private fun File.toResourcePath(): String = invariantSeparatorsPath.replace('\\'
 private fun normalizeTargets(targets: Set<String>): LinkedHashSet<String> = linkedSetOf<String>().apply {
     addAll(targets)
 }
+
+private val docsHttpClient: HttpClient = HttpClient.newHttpClient()
+
+internal fun docsBaseUrl(): String = (
+    System.getenv("COMPOSABLES_DOCS_BASE_URL")
+        ?: System.getProperty("composables.docs.baseUrl")
+        ?: "https://composables.com"
+    ).trimEnd('/')
+
+internal fun docsApiUrl(
+    endpoint: String,
+    queryParameters: Map<String, String> = emptyMap(),
+): String {
+    val normalizedEndpoint = endpoint.trim().trimStart('/')
+    val query = queryParameters.entries.joinToString("&") { (key, value) ->
+        "${urlEncode(key)}=${urlEncode(value)}"
+    }
+    return buildString {
+        append(docsBaseUrl())
+        append("/api/composables-ui-docs/")
+        append(normalizedEndpoint)
+        if (query.isNotEmpty()) {
+            append('?')
+            append(query)
+        }
+    }
+}
+
+internal fun docsMarkdownUrl(slug: String): String = buildString {
+    append(docsBaseUrl())
+    append("/ui/docs/")
+    append(urlEncode(slug.trim()))
+    append(".md")
+}
+
+private fun fetchUrl(url: String): String {
+    val request = HttpRequest.newBuilder()
+        .uri(URI.create(url))
+        .header("Accept", "application/json")
+        .GET()
+        .build()
+
+    val response = try {
+        docsHttpClient.send(request, HttpResponse.BodyHandlers.ofString())
+    } catch (error: Exception) {
+        throw UsageError("Failed to reach Composables UI docs at $url: ${error.message}")
+    }
+
+    if (response.statusCode() !in 200..299) {
+        val body = response.body().trim()
+        val detail = if (body.isEmpty()) "No response body returned." else body
+        throw UsageError("Docs request failed (${response.statusCode()}) for $url\n$detail")
+    }
+
+    return response.body()
+}
+
+private fun fetchDocsApi(
+    endpoint: String,
+    queryParameters: Map<String, String> = emptyMap(),
+): String = fetchUrl(docsApiUrl(endpoint, queryParameters))
+
+private fun urlEncode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8)
 
 private data class ProjectInstruction(
     val label: String,
@@ -122,7 +191,7 @@ private fun buildProjectReadme(
 
 suspend fun main(args: Array<String>) {
     ComposablesCli()
-        .subcommands(Init(), Add().subcommands(AddModule()), Target())
+        .subcommands(Init(), Add().subcommands(AddModule()), Docs().subcommands(DocsList(), DocsSearch(), DocsGet()), Target())
         .main(args)
 }
 
@@ -232,6 +301,49 @@ class Add : CliktCommand("add") {
     """.trimIndent()
 
     override fun run() {
+    }
+}
+
+class Docs : CliktCommand("docs") {
+    override fun help(context: Context): String = """
+        Reads Composables UI documentation in a machine-friendly format.
+    """.trimIndent()
+
+    override fun run() {
+    }
+}
+
+class DocsList : CliktCommand("list") {
+    override fun help(context: Context): String = """
+        Lists all Composables UI documentation pages.
+    """.trimIndent()
+
+    override fun run() {
+        echo(fetchDocsApi("list"))
+    }
+}
+
+class DocsSearch : CliktCommand("search") {
+    override fun help(context: Context): String = """
+        Searches Composables UI documentation pages.
+    """.trimIndent()
+
+    private val query by argument("query", help = "Search query")
+
+    override fun run() {
+        echo(fetchDocsApi("search", mapOf("q" to query)))
+    }
+}
+
+class DocsGet : CliktCommand("get") {
+    override fun help(context: Context): String = """
+        Gets one Composables UI documentation page by slug.
+    """.trimIndent()
+
+    private val slug by argument("slug", help = "Documentation page slug")
+
+    override fun run() {
+        echo(fetchUrl(docsMarkdownUrl(slug)))
     }
 }
 
