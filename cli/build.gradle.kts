@@ -1,195 +1,198 @@
 @file:Suppress("UnstableApiUsage")
 
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import java.nio.charset.StandardCharsets
 import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.testing.Test
-import java.nio.charset.StandardCharsets
 
 plugins {
-    application
-    alias(libs.plugins.jvm)
-    alias(libs.plugins.shadow)
-    alias(libs.plugins.buildconfig)
+  application
+  alias(libs.plugins.jvm)
+  alias(libs.plugins.shadow)
+  alias(libs.plugins.buildconfig)
 }
 
 val mainClassName = "com.composables.cli.CliKt"
 val cliName = "composables"
 
 group = "com.composables"
+
 version = libs.versions.composables.cli.get()
 
-buildConfig {
-    buildConfigField("Version", libs.versions.composables.cli.get())
-}
+buildConfig { buildConfigField("Version", libs.versions.composables.cli.get()) }
 
 java {
-    toolchain {
-        vendor = JvmVendorSpec.JETBRAINS
-        languageVersion = JavaLanguageVersion.of(17)
-    }
+  toolchain {
+    vendor = JvmVendorSpec.JETBRAINS
+    languageVersion = JavaLanguageVersion.of(17)
+  }
 }
 
 kotlin {
-    jvmToolchain {
-        vendor = JvmVendorSpec.JETBRAINS
-        languageVersion = JavaLanguageVersion.of(17)
-    }
+  jvmToolchain {
+    vendor = JvmVendorSpec.JETBRAINS
+    languageVersion = JavaLanguageVersion.of(17)
+  }
 }
 
 application {
-    applicationName = cliName
-    mainClass.set(mainClassName)
+  applicationName = cliName
+  mainClass.set(mainClassName)
 }
 
 sourceSets {
-    named("main") {
-        java.setSrcDirs(listOf("src/jvmMain/kotlin"))
-        resources.setSrcDirs(listOf("src/jvmMain/resources"))
-    }
-    named("test") {
-        java.setSrcDirs(listOf("src/jvmTest/kotlin"))
-        resources.setSrcDirs(emptyList<String>())
-    }
-    create("integrationTest") {
-        java.setSrcDirs(listOf("src/integrationTest/kotlin"))
-        resources.setSrcDirs(emptyList<String>())
-        compileClasspath += sourceSets.main.get().output + configurations.testRuntimeClasspath.get()
-        runtimeClasspath += output + compileClasspath
-    }
-    create("npmTest") {
-        java.setSrcDirs(listOf("src/npmTest/kotlin"))
-        resources.setSrcDirs(emptyList<String>())
-        compileClasspath += sourceSets.main.get().output + configurations.testRuntimeClasspath.get()
-        runtimeClasspath += output + compileClasspath
-    }
+  named("main") {
+    java.setSrcDirs(listOf("src/jvmMain/kotlin"))
+    resources.setSrcDirs(listOf("src/jvmMain/resources"))
+  }
+  named("test") {
+    java.setSrcDirs(listOf("src/jvmTest/kotlin"))
+    resources.setSrcDirs(emptyList<String>())
+  }
+  create("integrationTest") {
+    java.setSrcDirs(listOf("src/integrationTest/kotlin"))
+    resources.setSrcDirs(emptyList<String>())
+    compileClasspath += sourceSets.main.get().output + configurations.testRuntimeClasspath.get()
+    runtimeClasspath += output + compileClasspath
+  }
+  create("npmTest") {
+    java.setSrcDirs(listOf("src/npmTest/kotlin"))
+    resources.setSrcDirs(emptyList<String>())
+    compileClasspath += sourceSets.main.get().output + configurations.testRuntimeClasspath.get()
+    runtimeClasspath += output + compileClasspath
+  }
 }
 
 val integrationTestSourceSet = sourceSets.named("integrationTest").get()
 val npmTestSourceSet = sourceSets.named("npmTest").get()
 
-configurations[integrationTestSourceSet.implementationConfigurationName].extendsFrom(configurations.testImplementation.get())
-configurations[integrationTestSourceSet.runtimeOnlyConfigurationName].extendsFrom(configurations.testRuntimeOnly.get())
-configurations[npmTestSourceSet.implementationConfigurationName].extendsFrom(configurations.testImplementation.get())
-configurations[npmTestSourceSet.runtimeOnlyConfigurationName].extendsFrom(configurations.testRuntimeOnly.get())
+configurations[integrationTestSourceSet.implementationConfigurationName].extendsFrom(
+    configurations.testImplementation.get())
+
+configurations[integrationTestSourceSet.runtimeOnlyConfigurationName].extendsFrom(
+    configurations.testRuntimeOnly.get())
+
+configurations[npmTestSourceSet.implementationConfigurationName].extendsFrom(
+    configurations.testImplementation.get())
+
+configurations[npmTestSourceSet.runtimeOnlyConfigurationName].extendsFrom(
+    configurations.testRuntimeOnly.get())
 
 dependencies {
-    implementation(libs.debugln)
-    implementation(libs.clikt)
-    implementation(libs.kotlinx.serialization.json)
+  implementation(libs.debugln)
+  implementation(libs.clikt)
+  implementation(libs.kotlinx.serialization.json)
 
-    testImplementation(libs.assertk)
-    testImplementation(kotlin("test"))
+  testImplementation(libs.assertk)
+  testImplementation(kotlin("test"))
 }
 
-tasks.test {
-    useJUnitPlatform()
-}
+tasks.test { useJUnitPlatform() }
 
-val integrationTest = tasks.register<Test>("integrationTest") {
-    description = "Runs end-to-end integration tests for the CLI."
-    group = "verification"
+val integrationTest =
+    tasks.register<Test>("integrationTest") {
+      description = "Runs end-to-end integration tests for the CLI."
+      group = "verification"
 
-    testClassesDirs = integrationTestSourceSet.output.classesDirs
-    classpath = integrationTestSourceSet.runtimeClasspath
-    shouldRunAfter(tasks.test)
-    dependsOn(tasks.named("installDist"))
-    dependsOn(tasks.named("shadowJar"))
-    useJUnitPlatform()
-}
+      testClassesDirs = integrationTestSourceSet.output.classesDirs
+      classpath = integrationTestSourceSet.runtimeClasspath
+      shouldRunAfter(tasks.test)
+      dependsOn(tasks.named("installDist"))
+      dependsOn(tasks.named("shadowJar"))
+      useJUnitPlatform()
+    }
 
-val npmPackageCheck = tasks.register<Test>("npmPackageCheck") {
-    description = "Verifies the published npm package installs and launches correctly."
-    group = "verification"
+val npmPackageCheck =
+    tasks.register<Test>("npmPackageCheck") {
+      description = "Verifies the published npm package installs and launches correctly."
+      group = "verification"
 
-    testClassesDirs = npmTestSourceSet.output.classesDirs
-    classpath = npmTestSourceSet.runtimeClasspath
-    shouldRunAfter(tasks.named("integrationTest"))
-    dependsOn(tasks.named("npmPack"))
-    useJUnitPlatform()
-}
+      testClassesDirs = npmTestSourceSet.output.classesDirs
+      classpath = npmTestSourceSet.runtimeClasspath
+      shouldRunAfter(tasks.named("integrationTest"))
+      dependsOn(tasks.named("npmPack"))
+      useJUnitPlatform()
+    }
 
 tasks.named<ShadowJar>("shadowJar") {
-    group = "build"
-    from(sourceSets.main.get().output)
-    configurations = listOf(project.configurations.runtimeClasspath.get())
+  group = "build"
+  from(sourceSets.main.get().output)
+  configurations = listOf(project.configurations.runtimeClasspath.get())
 
-    archiveFileName.set("$cliName.jar")
+  archiveFileName.set("$cliName.jar")
 
-    manifest {
-        attributes("Main-Class" to mainClassName)
-    }
-    mergeServiceFiles()
+  manifest { attributes("Main-Class" to mainClassName) }
+  mergeServiceFiles()
 }
 
 val npmPackageDir = layout.buildDirectory.dir("npm/package")
 val npmTarballDir = layout.buildDirectory.dir("npm/tarball")
 
-val assembleNpmPackage = tasks.register<Sync>("assembleNpmPackage") {
-    description = "Assembles the npm package for Composables CLI."
-    group = "distribution"
+val assembleNpmPackage =
+    tasks.register<Sync>("assembleNpmPackage") {
+      description = "Assembles the npm package for Composables CLI."
+      group = "distribution"
 
-    dependsOn(tasks.named("shadowJar"))
+      dependsOn(tasks.named("shadowJar"))
 
-    from("src/npm") {
+      from("src/npm") {
         includeEmptyDirs = false
         filteringCharset = StandardCharsets.UTF_8.name()
-        filesMatching("package.json") {
-            expand("version" to project.version.toString())
-        }
+        filesMatching("package.json") { expand("version" to project.version.toString()) }
+      }
+      from(rootProject.file("README.md"))
+      from(tasks.named<ShadowJar>("shadowJar")) { rename { "composables.jar" } }
+      into(npmPackageDir)
     }
-    from(rootProject.file("README.md"))
-    from(tasks.named<ShadowJar>("shadowJar")) {
-        rename { "composables.jar" }
-    }
-    into(npmPackageDir)
-}
 
-val npmPack = tasks.register<Exec>("npmPack") {
-    description = "Creates a tarball for the npm package."
-    group = "distribution"
+val npmPack =
+    tasks.register<Exec>("npmPack") {
+      description = "Creates a tarball for the npm package."
+      group = "distribution"
 
-    dependsOn(assembleNpmPackage)
+      dependsOn(assembleNpmPackage)
 
-    inputs.dir(npmPackageDir)
-    outputs.dir(npmTarballDir)
+      inputs.dir(npmPackageDir)
+      outputs.dir(npmTarballDir)
 
-    workingDir(npmPackageDir)
-    doFirst {
+      workingDir(npmPackageDir)
+      doFirst {
         delete(npmTarballDir)
         npmTarballDir.get().asFile.mkdirs()
+      }
+      commandLine(
+          npmCommand(), "pack", "--pack-destination", npmTarballDir.get().asFile.absolutePath)
     }
-    commandLine(npmCommand(), "pack", "--pack-destination", npmTarballDir.get().asFile.absolutePath)
-}
 
-tasks.jar {
-    finalizedBy(tasks.named("shadowJar"))
-}
+tasks.jar { finalizedBy(tasks.named("shadowJar")) }
 
 val devTemplateOutputDir = layout.buildDirectory.dir("dev-template")
 
 tasks.register<JavaExec>("renderTemplate") {
-    group = "application"
-    description = "Renders the bundled project template into build/dev-template/app for local JVM template development."
+  group = "application"
+  description =
+      "Renders the bundled project template into build/dev-template/app for local JVM template development."
 
-    dependsOn(tasks.jar)
+  dependsOn(tasks.jar)
 
-    mainClass.set("com.composables.cli.DevTemplateKt")
-    classpath(sourceSets.main.get().runtimeClasspath)
+  mainClass.set("com.composables.cli.DevTemplateKt")
+  classpath(sourceSets.main.get().runtimeClasspath)
 
-    systemProperty("composables.template.outputRoot", devTemplateOutputDir.get().asFile.absolutePath)
-    systemProperty("composables.template.projectDir", "app")
-    systemProperty("composables.template.targets", "jvm")
+  systemProperty("composables.template.outputRoot", devTemplateOutputDir.get().asFile.absolutePath)
+  systemProperty("composables.template.projectDir", "app")
+  systemProperty("composables.template.targets", "jvm")
 }
 
 tasks.register<Exec>("runTemplate") {
-    group = "application"
-    description = "Renders the bundled project template and runs its JVM target locally."
+  group = "application"
+  description = "Renders the bundled project template and runs its JVM target locally."
 
-    dependsOn("renderTemplate")
+  dependsOn("renderTemplate")
 
-    val renderedProjectDir = devTemplateOutputDir.map { it.dir("app") }
-    workingDir(renderedProjectDir)
-    commandLine("./gradlew", "run")
+  val renderedProjectDir = devTemplateOutputDir.map { it.dir("app") }
+  workingDir(renderedProjectDir)
+  commandLine("./gradlew", "run")
 }
 
-fun npmCommand(): String = if (System.getProperty("os.name").startsWith("Windows")) "npm.cmd" else "npm"
+fun npmCommand(): String =
+    if (System.getProperty("os.name").startsWith("Windows")) "npm.cmd" else "npm"
