@@ -92,7 +92,7 @@ internal fun mcpUrl(): String = buildString {
   append("/mcp")
 }
 
-private fun fetchUrl(url: String): String {
+internal fun fetchUrl(url: String): String {
   val request =
       HttpRequest.newBuilder()
           .uri(URI.create(url))
@@ -116,7 +116,7 @@ private fun fetchUrl(url: String): String {
   return response.body()
 }
 
-private fun fetchDocsApi(
+internal fun fetchDocsApi(
     endpoint: String,
     queryParameters: Map<String, String> = emptyMap(),
 ): String = fetchUrl(docsApiUrl(endpoint, queryParameters))
@@ -129,7 +129,7 @@ private data class ProjectInstruction(
     val command: String? = null,
 )
 
-private data class ProjectConventions(
+internal data class ProjectConventions(
     val kotlinMultiplatformPlugin: String,
     val composePlugin: String,
     val composeCompilerPlugin: String,
@@ -247,7 +247,8 @@ suspend fun main(args: Array<String>) {
           Init(),
           Add().subcommands(AddModule()),
           Docs().subcommands(DocsList(), DocsSearch(), DocsGet()),
-          Install().subcommands(InstallMcp()))
+          Install().subcommands(InstallMcp()),
+          Mcp().subcommands(McpStart()))
       .main(args)
 }
 
@@ -424,6 +425,20 @@ class DocsGet : CliktCommand("get") {
 
   override fun run() {
     echo(fetchUrl(docsMarkdownUrl(slug)))
+  }
+}
+
+class Mcp : CliktCommand("mcp") {
+  override fun help(context: Context): String =
+      """
+        Works with the Composables MCP server.
+    """
+          .trimIndent()
+
+  override fun run() {
+    if (currentContext.invokedSubcommand == null) {
+      echoFormattedHelp()
+    }
   }
 }
 
@@ -823,14 +838,14 @@ internal fun validateInitTargetDirectory(target: File, overwrite: Boolean) {
   }
 }
 
-private fun validateExistingGradleProject(projectRoot: File) {
+internal fun validateExistingGradleProject(projectRoot: File) {
   if (!File(projectRoot, "settings.gradle.kts").exists()) {
     throw UsageError(
         "This command must be run from the root of an existing Gradle project with a settings.gradle.kts file.")
   }
 }
 
-private fun validateModuleTargetDirectory(
+internal fun validateModuleTargetDirectory(
     projectRoot: File,
     target: File,
     overwrite: Boolean,
@@ -892,7 +907,7 @@ private fun readNewModuleDirectory(projectRoot: File): File {
   }
 }
 
-private fun toRelativeModulePath(projectRoot: File, target: File): String =
+internal fun toRelativeModulePath(projectRoot: File, target: File): String =
     projectRoot.toPath().normalize().relativize(target.toPath().normalize()).joinToString("/") {
       it.toString()
     }
@@ -1219,7 +1234,7 @@ fun cloneGradleProject(
   )
 }
 
-private fun cloneGradleProjectAt(
+internal fun cloneGradleProjectAt(
     target: File,
     packageName: String,
     appName: String,
@@ -1707,7 +1722,7 @@ private fun stripPreviewSupport(content: String): String =
             "\n",
         )
 
-private fun inferProjectConventions(projectRoot: File, targets: Set<String>): ProjectConventions {
+internal fun inferProjectConventions(projectRoot: File, targets: Set<String>): ProjectConventions {
   val normalizedTargets = normalizeTargets(targets)
   val versionCatalog = File(projectRoot, "gradle/libs.versions.toml")
   if (!versionCatalog.isFile) {
@@ -2151,7 +2166,7 @@ private fun updateSection(content: String, sectionName: String, newEntries: List
   return lines.joinToString("\n")
 }
 
-private fun addModuleToSettings(
+internal fun addModuleToSettings(
     projectRoot: File,
     modulePaths: List<String>,
 ) {
@@ -2297,7 +2312,7 @@ private fun createLibraryModule(
   return modulePath
 }
 
-private fun createModuleGroup(
+internal fun createModuleGroup(
     projectRoot: File,
     appRootDir: File,
     packageName: String,

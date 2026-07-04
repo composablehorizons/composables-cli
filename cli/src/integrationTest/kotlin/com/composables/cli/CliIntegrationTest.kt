@@ -281,6 +281,95 @@ class CliIntegrationTest {
   }
 
   @Test
+  fun `cli mcp server exposes tools and creates project over stdio`() {
+    val rootDir = createTempRoot("composables-cli-mcp-server")
+    try {
+      val launcher = installedLauncher()
+      val projectDir = File(rootDir, "mcp-app")
+      val stdin =
+          mcpFrame(
+              """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test-client","version":"1.0.0"}}}""") +
+              mcpFrame("""{"jsonrpc":"2.0","method":"notifications/initialized"}""") +
+              mcpFrame("""{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}""") +
+              mcpFrame(
+                  """{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"composables_create_project","arguments":{"directory":"mcp-app","packageName":"com.example.mcpapp","appName":"MCP App","targets":"jvm"}}}""")
+
+      val result =
+          runProcessUntilOutputContains(
+              command = listOf(launcher.absolutePath, "mcp", "start"),
+              workingDir = rootDir,
+              stdin = stdin,
+              expectedOutput = "Created Compose Multiplatform project",
+              timeoutSeconds = 60,
+          )
+
+      assertThat(result.finished).isTrue()
+      assertThat(result.output).contains("composables_docs_search")
+      assertThat(result.output).contains("composables_create_project")
+      assertThat(result.output).contains("Created Compose Multiplatform project")
+      assertThat(File(projectDir, "settings.gradle.kts").exists()).isTrue()
+      assertThat(
+              File(projectDir, "shared/src/commonMain/kotlin/com/example/mcpapp/App.kt").exists())
+          .isTrue()
+    } finally {
+      rootDir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `cli mcp server adds module over stdio`() {
+    val rootDir = createTempRoot("composables-cli-mcp-add-module")
+    try {
+      val launcher = installedLauncher()
+      val projectDir = File(rootDir, "base-app")
+      val createResult =
+          runProcess(
+              command =
+                  listOf(
+                      launcher.absolutePath,
+                      "init",
+                      projectDir.absolutePath,
+                      "--package",
+                      "com.example.baseapp",
+                      "--app-name",
+                      "Base App",
+                      "--targets",
+                      "jvm",
+                  ),
+              workingDir = rootDir,
+              timeoutSeconds = 60,
+          )
+      assertThat(createResult.finished).isTrue()
+      assertThat(createResult.exitCode).isEqualTo(0)
+
+      val stdin =
+          mcpFrame(
+              """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test-client","version":"1.0.0"}}}""") +
+              mcpFrame("""{"jsonrpc":"2.0","method":"notifications/initialized"}""") +
+              mcpFrame(
+                  """{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"composables_add_module","arguments":{"projectRoot":"base-app","path":"features/chat","packageName":"com.example.chat","appName":"Chat","targets":"jvm"}}}""")
+
+      val result =
+          runProcessUntilOutputContains(
+              command = listOf(launcher.absolutePath, "mcp", "start"),
+              workingDir = rootDir,
+              stdin = stdin,
+              expectedOutput = "Added Compose app module group",
+              timeoutSeconds = 60,
+          )
+
+      assertThat(result.finished).isTrue()
+      assertThat(result.output).contains("Added Compose app module group")
+      assertThat(File(projectDir, "features/chat/shared").isDirectory).isTrue()
+      assertThat(File(projectDir, "features/chat/desktopApp").isDirectory).isTrue()
+      assertThat(File(projectDir, "settings.gradle.kts").readText())
+          .contains("""include(":features:chat:shared")""")
+    } finally {
+      rootDir.deleteRecursively()
+    }
+  }
+
+  @Test
   fun `cli init requires overwrite for non-empty directories`() {
     val rootDir = createTempRoot("composables-cli-init-existing")
     try {
@@ -915,6 +1004,61 @@ class CliIntegrationTest {
       command
     }
   }
+
+  private fun runProcessUntilOutputContains(
+      command: List<String>,
+      workingDir: File,
+      stdin: String,
+      expectedOutput: String,
+      timeoutSeconds: Long,
+  ): ProcessResult {
+    val process =
+        ProcessBuilder(platformCommand(command))
+            .directory(workingDir)
+            .redirectErrorStream(true)
+            .start()
+
+    val output = StringBuilder()
+    val readerThread =
+        Thread {
+              process.inputStream.bufferedReader().useLines { lines ->
+                lines.forEach { line -> output.appendLine(line) }
+              }
+            }
+            .apply { start() }
+
+    process.outputStream.bufferedWriter().use { writer ->
+      writer.write(stdin)
+      writer.flush()
+    }
+
+    val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
+    var matched = false
+    while (System.nanoTime() < deadline) {
+      if (output.contains(expectedOutput)) {
+        matched = true
+        break
+      }
+      if (!process.isAlive) {
+        break
+      }
+      Thread.sleep(25)
+    }
+
+    if (process.isAlive) {
+      process.destroyForcibly()
+      process.waitFor(5, TimeUnit.SECONDS)
+    }
+    readerThread.join()
+
+    return ProcessResult(
+        finished = matched,
+        exitCode = if (!process.isAlive) process.exitValue() else -1,
+        output = output.toString(),
+    )
+  }
+
+  private fun mcpFrame(json: String): String = "$json\n"
 
   private data class ProcessResult(
       val finished: Boolean,
