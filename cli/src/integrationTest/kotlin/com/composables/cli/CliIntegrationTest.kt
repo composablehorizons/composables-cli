@@ -237,6 +237,50 @@ class CliIntegrationTest {
   }
 
   @Test
+  fun `cli install help lists the mcp subcommand`() {
+    val rootDir = createTempRoot("composables-cli-install-help")
+    try {
+      val launcher = installedLauncher()
+
+      val result =
+          runProcess(
+              command = listOf(launcher.absolutePath, "install", "--help"),
+              workingDir = rootDir,
+              timeoutSeconds = 60,
+          )
+
+      assertThat(result.finished).isTrue()
+      assertThat(result.exitCode).isEqualTo(0)
+      assertThat(result.output).contains("mcp")
+      assertThat(result.output).doesNotContain("--client")
+    } finally {
+      rootDir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `cli install mcp help exposes client selection`() {
+    val rootDir = createTempRoot("composables-cli-install-mcp")
+    try {
+      val launcher = installedLauncher()
+
+      val result =
+          runProcess(
+              command = listOf(launcher.absolutePath, "install", "mcp", "--help"),
+              workingDir = rootDir,
+              timeoutSeconds = 60,
+          )
+
+      assertThat(result.finished).isTrue()
+      assertThat(result.exitCode).isEqualTo(0)
+      assertThat(result.output).contains("--client")
+      assertThat(result.output).contains("--overwrite")
+    } finally {
+      rootDir.deleteRecursively()
+    }
+  }
+
+  @Test
   fun `cli init requires overwrite for non-empty directories`() {
     val rootDir = createTempRoot("composables-cli-init-existing")
     try {
