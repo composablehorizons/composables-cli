@@ -82,6 +82,8 @@ dependencies {
   implementation(libs.debugln)
   implementation(libs.clikt)
   implementation(libs.kotlinx.serialization.json)
+  implementation(libs.mcp.kotlin.server)
+  runtimeOnly(libs.slf4j.nop)
 
   testImplementation(libs.assertk)
   testImplementation(kotlin("test"))

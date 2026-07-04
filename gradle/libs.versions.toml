@@ -7,12 +7,16 @@ buildconfig = "6.0.6"
 debugln = "1.0.3"
 clikt = "5.0.3"
 serializationJson = "1.9.0"
+mcpKotlin = "0.14.0"
+slf4j = "2.0.17"
 assertk = "0.28.1"
 
 [libraries]
 debugln = { group = "com.alexstyl", name = "debugln", version.ref = "debugln" }
 clikt = { group = "com.github.ajalt.clikt", name = "clikt", version.ref = "clikt" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serializationJson" }
+mcp-kotlin-server = { group = "io.modelcontextprotocol", name = "kotlin-sdk-server", version.ref = "mcpKotlin" }
+slf4j-nop = { group = "org.slf4j", name = "slf4j-nop", version.ref = "slf4j" }
 assertk = { group = "com.willowtreeapps.assertk", name = "assertk", version.ref = "assertk" }
 
 [plugins]
