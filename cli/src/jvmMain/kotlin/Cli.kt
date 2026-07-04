@@ -221,6 +221,23 @@ private fun buildProjectReadme(
         lines += "- ${instruction.label}: $description"
       }
 
+  lines += ""
+  lines += "## Code Formatting"
+  lines += ""
+  lines += "This project uses ktfmt, provided via the Spotless gradle plugin."
+  lines += ""
+  lines += "To check for any formatting issues run:"
+  lines += ""
+  lines += "```shell"
+  lines += "./gradlew spotlessCheck"
+  lines += "```"
+  lines += ""
+  lines += "To automatically format your code run:"
+  lines += ""
+  lines += "```shell"
+  lines += "./gradlew spotlessApply"
+  lines += "```"
+
   return lines.joinToString("\n") + "\n"
 }
 

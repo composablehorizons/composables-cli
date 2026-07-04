@@ -844,6 +844,12 @@ class CliIntegrationTest {
     assertThat(rootBuild).contains("alias(libs.plugins.spotless)")
     assertThat(rootBuild).contains("ktfmt()")
 
+    val readme = File(projectDir, "README.md").readText()
+    assertThat(readme).contains("## Code Formatting")
+    assertThat(readme).contains("This project uses ktfmt, provided via the Spotless gradle plugin.")
+    assertThat(readme).contains("./gradlew spotlessCheck")
+    assertThat(readme).contains("./gradlew spotlessApply")
+
     val sharedApp =
         File(projectDir, "shared/src/commonMain/kotlin/com/example/sampleapp/App.kt").readText()
     assertThat(sharedApp)
