@@ -282,6 +282,31 @@ class CliIntegrationTest {
   }
 
   @Test
+  fun `cli mcp install writes cursor config`() {
+    val rootDir = createTempRoot("composables-cli-mcp-install-cursor")
+    try {
+      val launcher = installedLauncher()
+
+      val result =
+          runProcess(
+              command = listOf(launcher.absolutePath, "mcp", "install", "--client", "cursor"),
+              workingDir = rootDir,
+              timeoutSeconds = 60,
+          )
+
+      assertThat(result.finished).isTrue()
+      assertThat(result.exitCode).isEqualTo(0)
+      assertThat(result.output).contains("Installed Composables MCP for Cursor.")
+      val content = File(rootDir, ".cursor/mcp.json").readText()
+      assertThat(content).contains(""""command": "composables"""")
+      assertThat(content).contains(""""mcp"""")
+      assertThat(content).contains(""""start"""")
+    } finally {
+      rootDir.deleteRecursively()
+    }
+  }
+
+  @Test
   fun `cli mcp start exposes tools and creates project over stdio`() {
     val rootDir = createTempRoot("composables-cli-mcp-server")
     try {

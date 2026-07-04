@@ -553,6 +553,136 @@ class CliTest {
   }
 
   @Test
+  fun `installAntigravityMcpServer writes shared mcp config`() {
+    withTempDir { targetDir ->
+      val configFile = File(targetDir, "mcp_config.json")
+      val result = installAntigravityMcpServer(configFile = configFile)
+
+      val content = configFile.readText()
+      assertThat(result is McpInstallResult.Installed).isTrue()
+      assertThat(content).contains(""""mcpServers"""")
+      assertThat(content).contains(""""composables"""")
+      assertThat(content).contains(""""command": "composables"""")
+      assertThat(content).contains(""""mcp"""")
+      assertThat(content).contains(""""start"""")
+    }
+  }
+
+  @Test
+  fun `installClaudeCodeMcpServer writes project mcp config`() {
+    withTempDir { projectRoot ->
+      val result = installClaudeCodeMcpServer(projectRoot = projectRoot)
+      val configFile = File(projectRoot, ".mcp.json")
+
+      assertThat(result is McpInstallResult.Installed).isTrue()
+      assertThat(configFile).exists()
+      assertThat(configFile.readText()).contains(""""command": "composables"""")
+    }
+  }
+
+  @Test
+  fun `installCursorMcpServer writes cursor mcp config`() {
+    withTempDir { projectRoot ->
+      val result = installCursorMcpServer(projectRoot = projectRoot)
+      val configFile = File(projectRoot, ".cursor/mcp.json")
+
+      assertThat(result is McpInstallResult.Installed).isTrue()
+      assertThat(configFile).exists()
+      assertThat(configFile.readText()).contains(""""command": "composables"""")
+    }
+  }
+
+  @Test
+  fun `installOpenCodeMcpServer writes opencode config`() {
+    withTempDir { projectRoot ->
+      val result = installOpenCodeMcpServer(projectRoot = projectRoot)
+      val configFile = File(projectRoot, "opencode.json")
+      val content = configFile.readText()
+
+      assertThat(result is McpInstallResult.Installed).isTrue()
+      assertThat(content).contains(""""${'$'}schema": "https://opencode.ai/config.json"""")
+      assertThat(content).contains(""""mcp"""")
+      assertThat(content).contains(""""type": "local"""")
+      assertThat(content).contains(""""command": [""")
+      assertThat(content).contains(""""enabled": true""")
+    }
+  }
+
+  @Test
+  fun `json mcp installers preserve existing servers and return already installed`() {
+    withTempDir { projectRoot ->
+      val configFile =
+          File(projectRoot, ".cursor/mcp.json").apply {
+            parentFile.mkdirs()
+            writeText(
+                """
+                  {
+                    "mcpServers": {
+                      "figma": {
+                        "url": "https://mcp.figma.com/mcp"
+                      }
+                    }
+                  }
+                """
+                    .trimIndent(),
+            )
+          }
+
+      val firstResult = installCursorMcpServer(projectRoot = projectRoot)
+      val secondResult = installCursorMcpServer(projectRoot = projectRoot)
+      val content = configFile.readText()
+
+      assertThat(firstResult is McpInstallResult.Installed).isTrue()
+      assertThat(secondResult is McpInstallResult.AlreadyInstalled).isTrue()
+      assertThat(content).contains(""""figma"""")
+      assertThat(content).contains(""""composables"""")
+    }
+  }
+
+  @Test
+  fun `installCodexMcpServer writes project toml config`() {
+    withTempDir { projectRoot ->
+      val result = installCodexMcpServer(projectRoot = projectRoot)
+      val configFile = File(projectRoot, ".codex/config.toml")
+      val content = configFile.readText()
+
+      assertThat(result is McpInstallResult.Installed).isTrue()
+      assertThat(content).contains("[mcp_servers.composables]")
+      assertThat(content).contains("""command = "composables"""")
+      assertThat(content).contains("""args = ["mcp", "start"]""")
+    }
+  }
+
+  @Test
+  fun `installCodexMcpServer preserves existing config and returns already installed`() {
+    withTempDir { projectRoot ->
+      val configFile =
+          File(projectRoot, ".codex/config.toml").apply {
+            parentFile.mkdirs()
+            writeText(
+                """
+                  model = "gpt-5.1-codex"
+
+                  [mcp_servers.other]
+                  command = "other"
+                """
+                    .trimIndent() + "\n",
+            )
+          }
+
+      val firstResult = installCodexMcpServer(projectRoot = projectRoot)
+      val secondResult = installCodexMcpServer(projectRoot = projectRoot)
+      val content = configFile.readText()
+
+      assertThat(firstResult is McpInstallResult.Installed).isTrue()
+      assertThat(secondResult is McpInstallResult.AlreadyInstalled).isTrue()
+      assertThat(content).contains("""model = "gpt-5.1-codex"""")
+      assertThat(content).contains("[mcp_servers.other]")
+      assertThat(content).contains("[mcp_servers.composables]")
+    }
+  }
+
+  @Test
   fun `findAndroidStudioConfigDirectory selects latest mac config directory`() {
     withTempDir { homeDir ->
       File(homeDir, "Library/Application Support/Google/AndroidStudio2025.1").mkdirs()
