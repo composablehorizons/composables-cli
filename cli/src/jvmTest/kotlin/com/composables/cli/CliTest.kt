@@ -235,12 +235,12 @@ class CliTest {
 
             val content = File(targetDir, "build.gradle.kts").readText()
 
-            assertThat(content.countOccurrences("alias(libs.plugins.jetbrains.kotlin.multiplatform) apply false")).isEqualTo(1)
-            assertThat(content.countOccurrences("alias(libs.plugins.jetbrains.compose) apply false")).isEqualTo(1)
-            assertThat(content.countOccurrences("alias(libs.plugins.jetbrains.compose.compiler) apply false")).isEqualTo(1)
+            assertThat(content.countOccurrences("""alias(libs.plugins.jetbrains.kotlin.multiplatform) apply false""")).isEqualTo(1)
+            assertThat(content.countOccurrences("""alias(libs.plugins.jetbrains.compose) apply false""")).isEqualTo(1)
+            assertThat(content.countOccurrences("""alias(libs.plugins.jetbrains.compose.compiler) apply false""")).isEqualTo(1)
             assertThat(content).doesNotContain("alias(libs.plugins.jetbrains.compose.hotreload)")
-            assertThat(content.countOccurrences("alias(libs.plugins.android.application) apply false")).isEqualTo(1)
-            assertThat(content.countOccurrences("alias(libs.plugins.android.kotlin.multiplatform.library) apply false")).isEqualTo(1)
+            assertThat(content.countOccurrences("""alias(libs.plugins.android.application) apply false""")).isEqualTo(1)
+            assertThat(content.countOccurrences("""alias(libs.plugins.android.kotlin.multiplatform.library) apply false""")).isEqualTo(1)
         }
     }
 
@@ -276,7 +276,6 @@ class CliTest {
             assertThat(content).contains("""compose = "1.11.1"""")
             assertThat(content).doesNotContain("composeHotReload")
             assertThat(content).contains("""composablesUi = "0.1.0"""")
-        }
     }
 
     @Test
