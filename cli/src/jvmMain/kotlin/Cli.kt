@@ -247,8 +247,7 @@ suspend fun main(args: Array<String>) {
           Init(),
           Add().subcommands(AddModule()),
           Docs().subcommands(DocsList(), DocsSearch(), DocsGet()),
-          Install().subcommands(InstallMcp()),
-          Mcp().subcommands(McpStart()))
+          Mcp().subcommands(McpInstall(), McpStart()))
       .main(args)
 }
 
@@ -442,21 +441,7 @@ class Mcp : CliktCommand("mcp") {
   }
 }
 
-class Install : CliktCommand("install") {
-  override fun help(context: Context): String =
-      """
-        Installs Composables integrations for supported clients.
-    """
-          .trimIndent()
-
-  override fun run() {
-    if (currentContext.invokedSubcommand == null) {
-      echoFormattedHelp()
-    }
-  }
-}
-
-class InstallMcp : CliktCommand("mcp") {
+class McpInstall : CliktCommand("install") {
   override fun help(context: Context): String =
       """
         Installs Composables MCP for supported clients.

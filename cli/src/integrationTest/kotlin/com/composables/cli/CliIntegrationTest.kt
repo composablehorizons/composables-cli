@@ -237,21 +237,22 @@ class CliIntegrationTest {
   }
 
   @Test
-  fun `cli install help lists the mcp subcommand`() {
-    val rootDir = createTempRoot("composables-cli-install-help")
+  fun `cli mcp help lists mcp subcommands`() {
+    val rootDir = createTempRoot("composables-cli-mcp-help")
     try {
       val launcher = installedLauncher()
 
       val result =
           runProcess(
-              command = listOf(launcher.absolutePath, "install", "--help"),
+              command = listOf(launcher.absolutePath, "mcp", "--help"),
               workingDir = rootDir,
               timeoutSeconds = 60,
           )
 
       assertThat(result.finished).isTrue()
       assertThat(result.exitCode).isEqualTo(0)
-      assertThat(result.output).contains("mcp")
+      assertThat(result.output).contains("install")
+      assertThat(result.output).contains("start")
       assertThat(result.output).doesNotContain("--client")
     } finally {
       rootDir.deleteRecursively()
@@ -259,14 +260,14 @@ class CliIntegrationTest {
   }
 
   @Test
-  fun `cli install mcp help exposes client selection`() {
-    val rootDir = createTempRoot("composables-cli-install-mcp")
+  fun `cli mcp install help exposes client selection`() {
+    val rootDir = createTempRoot("composables-cli-mcp-install")
     try {
       val launcher = installedLauncher()
 
       val result =
           runProcess(
-              command = listOf(launcher.absolutePath, "install", "mcp", "--help"),
+              command = listOf(launcher.absolutePath, "mcp", "install", "--help"),
               workingDir = rootDir,
               timeoutSeconds = 60,
           )
@@ -281,7 +282,7 @@ class CliIntegrationTest {
   }
 
   @Test
-  fun `cli mcp server exposes tools and creates project over stdio`() {
+  fun `cli mcp start exposes tools and creates project over stdio`() {
     val rootDir = createTempRoot("composables-cli-mcp-server")
     try {
       val launcher = installedLauncher()
@@ -317,7 +318,7 @@ class CliIntegrationTest {
   }
 
   @Test
-  fun `cli mcp server adds module over stdio`() {
+  fun `cli mcp start adds module over stdio`() {
     val rootDir = createTempRoot("composables-cli-mcp-add-module")
     try {
       val launcher = installedLauncher()
