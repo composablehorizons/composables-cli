@@ -41,6 +41,11 @@ val IOS_APP_MODULE = "iosApp"
 val DESKTOP_APP_MODULE = "desktopApp"
 val WEB_APP_MODULE = "webApp"
 
+private enum class AddModuleType(val id: String, val displayName: String) {
+  App("app", "App"),
+  Library("library", "Library"),
+}
+
 private fun File.toResourcePath(): String = invariantSeparatorsPath.replace('\\', '/')
 
 private fun normalizeTargets(targets: Set<String>): LinkedHashSet<String> =
@@ -215,6 +220,23 @@ private fun buildProjectReadme(
         val description = instruction.command?.let { "`$it`" } ?: instruction.detail
         lines += "- ${instruction.label}: $description"
       }
+
+  lines += ""
+  lines += "## Code Formatting"
+  lines += ""
+  lines += "This project uses ktfmt, provided via the Spotless gradle plugin."
+  lines += ""
+  lines += "To check for any formatting issues run:"
+  lines += ""
+  lines += "```shell"
+  lines += "./gradlew spotlessCheck"
+  lines += "```"
+  lines += ""
+  lines += "To automatically format your code run:"
+  lines += ""
+  lines += "```shell"
+  lines += "./gradlew spotlessApply"
+  lines += "```"
 
   return lines.joinToString("\n") + "\n"
 }
@@ -461,14 +483,13 @@ class InstallMcp : CliktCommand("mcp") {
 class AddModule : CliktCommand("module") {
   override fun help(context: Context): String =
       """
-        Adds a new Compose app module group to the current Gradle project.
+        Adds a new Compose module to the current Gradle project.
     """
           .trimIndent()
 
-  private val path by
-      argument("path", help = "The path to create the new module group in").optional()
-  private val packageName by
-      option("--package", help = "The package name for the generated app module group")
+  private val path by argument("path", help = "The path to create the new module in").optional()
+  private val moduleTypeInput by option("--type", help = "Module type: app or library")
+  private val packageName by option("--package", help = "The package name for the generated module")
   private val appName by option("--app-name", help = "The display name for the generated app")
   private val targetsInput by
       option("--targets", help = "Comma-separated targets: android,jvm,ios,wasm")
@@ -488,33 +509,51 @@ class AddModule : CliktCommand("module") {
     }
 
     val anyExplicitInput =
-        path != null || packageName != null || appName != null || targetsInput != null || overwrite
+        path != null ||
+            moduleTypeInput != null ||
+            packageName != null ||
+            appName != null ||
+            targetsInput != null ||
+            overwrite
 
     val target: File
+    val moduleType: AddModuleType
     val resolvedPackageName: String
-    val resolvedAppName: String
+    val resolvedAppName: String?
     val targets: Set<String>
 
     if (!anyExplicitInput) {
       try {
         target = readNewModuleDirectory(projectRoot)
+        moduleType = readAddModuleType()
         resolvedPackageName = readNamespace()
-        resolvedAppName = readAppName()
+        resolvedAppName =
+            when (moduleType) {
+              AddModuleType.App -> readAppName()
+              AddModuleType.Library -> null
+            }
         targets = readTargets()
       } catch (error: RuntimeException) {
         if (error::class.simpleName == "ReadAfterEOFException" ||
             error.message?.contains("EOF has already been reached") == true) {
           throw UsageError(
-              "Interactive mode requires stdin. Pass <path>, --package, --app-name, and --targets for non-interactive use.",
+              "Interactive mode requires stdin. Pass <path>, --type, --package, and --targets for non-interactive use.",
           )
         }
         throw error
       }
     } else {
+      moduleType =
+          try {
+            parseAddModuleType(moduleTypeInput)
+          } catch (error: IllegalArgumentException) {
+            throw UsageError(error.message ?: "Invalid module type")
+          }
       val missingInputs = buildList {
         if (path == null) add("<path>")
+        if (moduleTypeInput == null) add("--type")
         if (packageName == null) add("--package")
-        if (appName == null) add("--app-name")
+        if (moduleType == AddModuleType.App && appName == null) add("--app-name")
         if (targetsInput == null) add("--targets")
       }
       if (missingInputs.isNotEmpty()) {
@@ -523,14 +562,18 @@ class AddModule : CliktCommand("module") {
       }
 
       resolvedPackageName = packageName!!
-      resolvedAppName = appName!!
+      resolvedAppName = appName
 
       if (!isValidPackageName(resolvedPackageName)) {
         throw UsageError(
             "Invalid package name. Must be a valid Java package name (e.g., com.example.app)")
       }
 
-      if (!isValidAppName(resolvedAppName)) {
+      if (moduleType == AddModuleType.Library && appName != null) {
+        throw UsageError("--app-name is only supported for app modules")
+      }
+
+      if (moduleType == AddModuleType.App && !isValidAppName(resolvedAppName!!)) {
         throw UsageError("Invalid app name. Must contain at least one letter or digit")
       }
 
@@ -552,24 +595,41 @@ class AddModule : CliktCommand("module") {
     val modulePath = toRelativeModulePath(projectRoot, target)
     val conventions = inferProjectConventions(projectRoot, targets)
     val includedModules =
-        createModuleGroup(
-            projectRoot = projectRoot,
-            appRootDir = target,
-            packageName = resolvedPackageName,
-            appName = resolvedAppName,
-            targets = targets,
-            conventions = conventions,
-        )
+        when (moduleType) {
+          AddModuleType.App ->
+              createModuleGroup(
+                  projectRoot = projectRoot,
+                  appRootDir = target,
+                  packageName = resolvedPackageName,
+                  appName = resolvedAppName!!,
+                  targets = targets,
+                  conventions = conventions,
+              )
+          AddModuleType.Library ->
+              listOf(
+                  createLibraryModule(
+                      projectRoot = projectRoot,
+                      moduleDir = target,
+                      packageName = resolvedPackageName,
+                      targets = targets,
+                      conventions = conventions,
+                  ),
+              )
+        }
     addModuleToSettings(projectRoot, includedModules)
 
     infoln { "" }
-    infoln { "App Module Configuration:" }
-    infoln { "\tApp Name: $resolvedAppName" }
+    infoln { "${moduleType.displayName} Module Configuration:" }
+    if (resolvedAppName != null) {
+      infoln { "\tApp Name: $resolvedAppName" }
+    }
     infoln { "\tPackage: $resolvedPackageName" }
     infoln { "\tModule: $modulePath" }
     infoln { "\tTargets: ${targets.joinToString(", ")}" }
     infoln { "" }
-    debugln { "Success! Your new Compose app module group is ready at ${target.absolutePath}" }
+    debugln {
+      "Success! Your new Compose ${moduleType.id} module is ready at ${target.absolutePath}"
+    }
   }
 }
 
@@ -836,6 +896,40 @@ private fun toRelativeModulePath(projectRoot: File, target: File): String =
     projectRoot.toPath().normalize().relativize(target.toPath().normalize()).joinToString("/") {
       it.toString()
     }
+
+private fun readAddModuleType(): AddModuleType {
+  while (true) {
+    println("What type of module do you want to add?")
+    println("1. App")
+    println("2. Library")
+    print("Select module type (1-2, default: app): ")
+    val input = readln().trim().lowercase()
+
+    when (input) {
+      "",
+      "1",
+      "app" -> return AddModuleType.App
+      "2",
+      "library",
+      "lib" -> return AddModuleType.Library
+      else -> println("Invalid module type. Enter app or library.")
+    }
+  }
+}
+
+private fun parseAddModuleType(input: String?): AddModuleType {
+  val normalized = input?.trim()?.lowercase().orEmpty()
+  return when (normalized) {
+    AddModuleType.App.id -> AddModuleType.App
+    AddModuleType.Library.id,
+    "lib" -> AddModuleType.Library
+    "" ->
+        throw IllegalArgumentException("Module type is required. Use --type app or --type library")
+    else ->
+        throw IllegalArgumentException(
+            "Unknown module type '$input'. Available types: app, library")
+  }
+}
 
 internal fun readNewAppDirectory(workingDir: String): File {
   while (true) {
@@ -2072,6 +2166,135 @@ private fun addModuleToSettings(
   if (newStatements.isEmpty()) return
 
   settingsFile.writeText(existingContent.trimEnd() + "\n" + newStatements.joinToString("\n") + "\n")
+}
+
+private fun createLibraryModule(
+    projectRoot: File,
+    moduleDir: File,
+    packageName: String,
+    targets: Set<String>,
+    conventions: ProjectConventions,
+): String {
+  val normalizedTargets = normalizeTargets(targets)
+  val modulePath = toRelativeModulePath(projectRoot, moduleDir)
+  val moduleName = moduleDir.name
+  val imports = buildList {
+    if (normalizedTargets.contains(ANDROID)) add("import org.jetbrains.kotlin.gradle.dsl.JvmTarget")
+    if (normalizedTargets.contains(WASM))
+        add("import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl")
+  }
+  val plugins = buildList {
+    add("    alias(${conventions.kotlinMultiplatformPlugin})")
+    add("    alias(${conventions.composePlugin})")
+    add("    alias(${conventions.composeCompilerPlugin})")
+    if (normalizedTargets.contains(ANDROID)) {
+      add("    alias(${conventions.androidKotlinMultiplatformLibraryPlugin})")
+    }
+  }
+  val kotlinTargets = buildList {
+    if (normalizedTargets.contains(ANDROID)) {
+      add(
+          """    android {
+        namespace = "$packageName"
+        compileSdk = ${conventions.androidCompileSdkExpression}
+        minSdk = ${conventions.androidMinSdkExpression}
+        withJava()
+        androidResources {
+            enable = true
+        }
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
+    }""",
+      )
+    }
+    if (normalizedTargets.contains(IOS)) {
+      add(
+          """    listOf(
+        iosArm64(),
+        iosSimulatorArm64(),
+    ).forEach { iosTarget ->
+        iosTarget.binaries.framework {
+            baseName = "${toCamelCase(moduleName)}"
+            isStatic = true
+        }
+    }""",
+      )
+    }
+    if (normalizedTargets.contains(JVM)) {
+      add("    jvm()")
+    }
+    if (normalizedTargets.contains(WASM)) {
+      add(
+          """    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        browser()
+    }""",
+      )
+    }
+  }
+
+  moduleDir.mkdirs()
+  File(moduleDir, "build.gradle.kts")
+      .writeText(
+          buildString {
+            if (imports.isNotEmpty()) {
+              append(imports.joinToString("\n"))
+              append("\n\n")
+            }
+            append("plugins {\n")
+            append(plugins.joinToString("\n"))
+            append("\n}\n\n")
+            append("kotlin {\n")
+            append(kotlinTargets.joinToString("\n\n"))
+            append("\n\n")
+            append(
+                """    sourceSets {
+        commonMain.dependencies {
+            implementation(${conventions.composablesIconsLucideDependency})
+            implementation(${conventions.composablesUriPainterDependency})
+            implementation(${conventions.composablesUiDependency})
+        }
+    }
+""",
+            )
+            append("}\n")
+          },
+      )
+
+  val sourceFile =
+      File(moduleDir, "src/commonMain/kotlin/${packageName.replace(".", "/")}/Library.kt")
+  sourceFile.parentFile.mkdirs()
+  sourceFile.writeText(
+      """
+      package $packageName
+
+      import androidx.compose.foundation.layout.Box
+      import androidx.compose.foundation.layout.fillMaxSize
+      import androidx.compose.foundation.layout.padding
+      import androidx.compose.runtime.Composable
+      import androidx.compose.ui.Alignment
+      import androidx.compose.ui.Modifier
+      import androidx.compose.ui.unit.dp
+      import com.composables.ui.components.Text
+      import com.composables.ui.theme.ComposablesTheme
+
+      @Composable
+      fun LibraryContent(modifier: Modifier = Modifier) {
+        ComposablesTheme {
+          Box(
+            modifier = modifier.fillMaxSize().padding(16.dp),
+            contentAlignment = Alignment.Center,
+          ) {
+            Text("Hello from $moduleName")
+          }
+        }
+      }
+      """
+          .trimIndent() + "\n",
+  )
+
+  return modulePath
 }
 
 private fun createModuleGroup(
