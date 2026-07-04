@@ -396,6 +396,8 @@ class CliIntegrationTest {
                       "add",
                       "module",
                       nestedModulePath,
+                      "--type",
+                      "app",
                       "--package",
                       nestedPackage,
                       "--app-name",
@@ -501,6 +503,187 @@ class CliIntegrationTest {
         assertThat(distributedIndexFile).contains("<!-- wasm-preloads:start -->")
         assertThat(distributedIndexFile).contains("""rel="preload"""")
       }
+    } finally {
+      rootDir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `cli add module creates a flat library module that compiles`() {
+    val rootDir = createTempRoot("composables-cli-add-library-module")
+    try {
+      val isWindows = System.getProperty("os.name").startsWith("Windows")
+      val projectName = if (isWindows) "s" else "sample-app"
+      val rootPackage = if (isWindows) "c.e.s" else "com.example.sampleapp"
+      val rootAppName = if (isWindows) "S" else "Sample App"
+      val libraryModulePath = if (isWindows) "l" else "screen-templates"
+      val libraryPackage = if (isWindows) "c.e.l" else "com.example.templates"
+      val libraryPackagePath = libraryPackage.replace(".", "/")
+      val libraryModuleGradlePath = ":" + libraryModulePath.replace('/', ':')
+      val projectDir = File(rootDir, projectName)
+      val launcher = installedLauncher()
+
+      val initResult =
+          runProcess(
+              command =
+                  listOf(
+                      launcher.absolutePath,
+                      "init",
+                      projectDir.absolutePath,
+                      "--package",
+                      rootPackage,
+                      "--app-name",
+                      rootAppName,
+                      "--targets",
+                      "android,jvm,wasm",
+                  ),
+              workingDir = rootDir,
+              timeoutSeconds = 60,
+          )
+
+      assertThat(initResult.finished).isTrue()
+      assertThat(initResult.exitCode).isEqualTo(0)
+
+      rewriteProjectToUiStyleConventions(projectDir)
+      val rootBuildBeforeAdd = File(projectDir, "build.gradle.kts").readText()
+      val versionCatalogBeforeAdd = File(projectDir, "gradle/libs.versions.toml").readText()
+
+      val addResult =
+          runProcess(
+              command =
+                  listOf(
+                      launcher.absolutePath,
+                      "add",
+                      "module",
+                      libraryModulePath,
+                      "--type",
+                      "library",
+                      "--package",
+                      libraryPackage,
+                      "--targets",
+                      "jvm,wasm",
+                  ),
+              workingDir = projectDir,
+              timeoutSeconds = 60,
+          )
+
+      assertThat(addResult.finished).isTrue()
+      assertThat(addResult.exitCode).isEqualTo(0)
+      assertThat(addResult.output).contains("Library Module Configuration")
+      assertThat(addResult.output).doesNotContain("App Name")
+
+      val libraryModuleDir = File(projectDir, libraryModulePath)
+      assertThat(File(libraryModuleDir, "build.gradle.kts").exists()).isTrue()
+      assertThat(
+              File(libraryModuleDir, "src/commonMain/kotlin/$libraryPackagePath/Library.kt")
+                  .exists())
+          .isTrue()
+      assertThat(File(libraryModuleDir, "shared").exists()).isFalse()
+      assertThat(File(libraryModuleDir, "desktopApp").exists()).isFalse()
+      assertThat(File(libraryModuleDir, "webApp").exists()).isFalse()
+
+      val settingsContent = File(projectDir, "settings.gradle.kts").readText()
+      assertThat(settingsContent).contains("""include("$libraryModuleGradlePath")""")
+      assertThat(File(projectDir, "build.gradle.kts").readText()).isEqualTo(rootBuildBeforeAdd)
+      assertThat(File(projectDir, "gradle/libs.versions.toml").readText())
+          .isEqualTo(versionCatalogBeforeAdd)
+
+      val libraryBuildFile = File(libraryModuleDir, "build.gradle.kts").readText()
+      assertThat(libraryBuildFile).contains("alias(libs.plugins.kotlin.multiplatform)")
+      assertThat(libraryBuildFile).contains("alias(libs.plugins.compose)")
+      assertThat(libraryBuildFile).contains("alias(libs.plugins.compose.compiler)")
+      assertThat(libraryBuildFile).contains("implementation(libs.composables.ui)")
+      assertThat(libraryBuildFile).contains("implementation(libs.composables.uri.painter)")
+      assertThat(libraryBuildFile).contains("jvm()")
+      assertThat(libraryBuildFile).contains("wasmJs")
+      assertThat(libraryBuildFile).doesNotContain("binaries.executable")
+
+      if (isWindows) {
+        val evaluationResult =
+            runProcess(
+                command = projectGradleCommand("$libraryModuleGradlePath:tasks", "--all"),
+                workingDir = projectDir,
+                timeoutSeconds = 180,
+            )
+
+        assertThat(evaluationResult.finished).isTrue()
+        assertThat(evaluationResult.exitCode).isEqualTo(0)
+        assertThat(evaluationResult.output).contains("compileKotlinJvm")
+      } else {
+        val compileResult =
+            runProcess(
+                command =
+                    projectGradleCommand(
+                        "$libraryModuleGradlePath:compileKotlinJvm",
+                        "$libraryModuleGradlePath:compileKotlinWasmJs",
+                    ),
+                workingDir = projectDir,
+                timeoutSeconds = 180,
+            )
+
+        assertThat(compileResult.finished).isTrue()
+        assertThat(compileResult.exitCode).isEqualTo(0)
+        assertThat(compileResult.output).contains("BUILD SUCCESSFUL")
+      }
+    } finally {
+      rootDir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `cli add module prompts for module type interactively`() {
+    val rootDir = createTempRoot("composables-cli-add-module-interactive")
+    try {
+      val projectDir = File(rootDir, "sample-app")
+      val launcher = installedLauncher()
+
+      val initResult =
+          runProcess(
+              command =
+                  listOf(
+                      launcher.absolutePath,
+                      "init",
+                      projectDir.absolutePath,
+                      "--package",
+                      "com.example.sampleapp",
+                      "--app-name",
+                      "Sample App",
+                      "--targets",
+                      "jvm,wasm",
+                  ),
+              workingDir = rootDir,
+              timeoutSeconds = 60,
+          )
+
+      assertThat(initResult.finished).isTrue()
+      assertThat(initResult.exitCode).isEqualTo(0)
+
+      val addResult =
+          runProcess(
+              command = listOf(launcher.absolutePath, "add", "module"),
+              workingDir = projectDir,
+              stdin =
+                  """
+                  screen-templates
+                  2
+                  com.example.templates
+                  n
+                  y
+                  n
+                  y
+                  """
+                      .trimIndent() + "\n",
+              timeoutSeconds = 60,
+          )
+
+      assertThat(addResult.finished).isTrue()
+      assertThat(addResult.exitCode).isEqualTo(0)
+      assertThat(addResult.output).contains("What type of module do you want to add?")
+      assertThat(addResult.output).contains("Library Module Configuration")
+      assertThat(File(projectDir, "screen-templates/build.gradle.kts").exists()).isTrue()
+      assertThat(File(projectDir, "screen-templates/shared").exists()).isFalse()
+      assertThat(File(projectDir, "settings.gradle.kts").readText())
+          .contains("""include(":screen-templates")""")
     } finally {
       rootDir.deleteRecursively()
     }
