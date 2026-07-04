@@ -225,7 +225,7 @@ suspend fun main(args: Array<String>) {
           Init(),
           Add().subcommands(AddModule()),
           Docs().subcommands(DocsList(), DocsSearch(), DocsGet()),
-          Install(),
+          Install().subcommands(InstallMcp()),
           Target())
       .main(args)
 }
@@ -410,6 +410,20 @@ class Install : CliktCommand("install") {
   override fun help(context: Context): String =
       """
         Installs Composables integrations for supported clients.
+    """
+          .trimIndent()
+
+  override fun run() {
+    if (currentContext.invokedSubcommand == null) {
+      echoFormattedHelp()
+    }
+  }
+}
+
+class InstallMcp : CliktCommand("mcp") {
+  override fun help(context: Context): String =
+      """
+        Installs Composables MCP for supported clients.
     """
           .trimIndent()
 
