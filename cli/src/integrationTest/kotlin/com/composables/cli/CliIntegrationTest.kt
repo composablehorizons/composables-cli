@@ -64,7 +64,7 @@ class CliIntegrationTest {
 
       val compileResult =
           runProcess(
-              command = listOf(projectGradleScript(), ":shared:compileKotlinJvm"),
+              command = projectGradleCommand(":shared:compileKotlinJvm"),
               workingDir = projectDir,
               timeoutSeconds = 180,
           )
@@ -115,7 +115,7 @@ class CliIntegrationTest {
 
       val tasksResult =
           runProcess(
-              command = listOf(projectGradleScript(), "tasks", "--all"),
+              command = projectGradleCommand("tasks", "--all"),
               workingDir = projectDir,
               timeoutSeconds = 180,
           )
@@ -163,10 +163,8 @@ class CliIntegrationTest {
       val compileResult =
           runProcess(
               command =
-                  listOf(
-                      projectGradleScript(),
-                      ":shared:compileKotlinWasmJs",
-                      ":webApp:compileKotlinWasmJs"),
+                  projectGradleCommand(
+                      ":shared:compileKotlinWasmJs", ":webApp:compileKotlinWasmJs"),
               workingDir = projectDir,
               timeoutSeconds = 180,
           )
@@ -203,7 +201,7 @@ class CliIntegrationTest {
 
       val compileResult =
           runProcess(
-              command = listOf(projectGradleScript(), ":shared:compileKotlinJvm"),
+              command = projectGradleCommand(":shared:compileKotlinJvm"),
               workingDir = projectDir,
               timeoutSeconds = 180,
           )
@@ -413,8 +411,7 @@ class CliIntegrationTest {
       if (isWindows) {
         val evaluationResult =
             runProcess(
-                command =
-                    listOf(projectGradleScript(), "$nestedModuleGradlePath:webApp:tasks", "--all"),
+                command = projectGradleCommand("$nestedModuleGradlePath:webApp:tasks", "--all"),
                 workingDir = projectDir,
                 timeoutSeconds = 180,
             )
@@ -426,8 +423,7 @@ class CliIntegrationTest {
         val compileResult =
             runProcess(
                 command =
-                    listOf(
-                        projectGradleScript(),
+                    projectGradleCommand(
                         "$nestedModuleGradlePath:shared:compileKotlinJvm",
                         "$nestedModuleGradlePath:shared:compileKotlinWasmJs",
                         "$nestedModuleGradlePath:desktopApp:compileKotlinJvm",
@@ -444,8 +440,7 @@ class CliIntegrationTest {
         val distributionResult =
             runProcess(
                 command =
-                    listOf(
-                        projectGradleScript(),
+                    projectGradleCommand(
                         "$nestedModuleGradlePath:webApp:wasmJsBrowserDistribution"),
                 workingDir = projectDir,
                 timeoutSeconds = 180,
@@ -556,6 +551,13 @@ class CliIntegrationTest {
         "./gradlew"
       }
 
+  private fun projectGradleCommand(vararg arguments: String): List<String> = buildList {
+    add(projectGradleScript())
+    add("--no-daemon")
+    add("--console=plain")
+    addAll(arguments)
+  }
+
   private fun assertJvmReadme(projectDir: File) {
     val readme = File(projectDir, "README.md")
     assertThat(readme.exists()).isTrue()
@@ -570,7 +572,7 @@ class CliIntegrationTest {
 
     val hotRunHelp =
         runProcess(
-            command = listOf(projectGradleScript(), "help", "--task", ":desktopApp:hotRunJvm"),
+            command = projectGradleCommand("help", "--task", ":desktopApp:hotRunJvm"),
             workingDir = projectDir,
             timeoutSeconds = 180,
         )
