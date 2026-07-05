@@ -35,6 +35,7 @@ class CliTest {
       val desktopBuildFile = File(projectDir, "desktopApp/build.gradle.kts")
       val rootBuildFile = File(projectDir, "build.gradle.kts")
       val readmeFile = File(projectDir, "README.md")
+      val gitignoreFile = File(projectDir, ".gitignore")
       val settingsFile = File(projectDir, "settings.gradle.kts")
       val appFile = File(projectDir, "shared/src/commonMain/kotlin/com/composables/demo/App.kt")
       val desktopMainFile =
@@ -46,6 +47,7 @@ class CliTest {
       assertThat(desktopBuildFile.exists(), "Generated desktop module build file should exist")
           .isTrue()
       assertThat(readmeFile.exists(), "Generated README should exist").isTrue()
+      assertThat(gitignoreFile.exists(), "Generated .gitignore should exist").isTrue()
       assertThat(settingsFile.exists(), "Generated settings file should exist").isTrue()
       assertThat(appFile.exists(), "App source should be moved to the requested package").isTrue()
       assertThat(desktopMainFile.exists(), "Desktop launcher source should exist").isTrue()
@@ -72,6 +74,7 @@ class CliTest {
       val desktopMainContent = desktopMainFile.readText()
       val rootBuildContent = rootBuildFile.readText()
       val readmeContent = readmeFile.readText()
+      val gitignoreContent = gitignoreFile.readText()
       val settingsContent = settingsFile.readText()
       val appContent = appFile.readText()
 
@@ -101,6 +104,9 @@ class CliTest {
       assertThat(readmeContent).doesNotContain(":androidApp:installDebug")
       assertThat(readmeContent).doesNotContain("iosApp/iosApp.xcodeproj")
       assertThat(readmeContent).doesNotContain(":webApp:wasmJsBrowserDevelopmentRun")
+      assertThat(gitignoreContent).contains(".idea")
+      assertThat(gitignoreContent).contains(".gradle")
+      assertThat(gitignoreContent).contains("**/build/")
 
       assertThat(appContent).contains("package com.composables.demo")
       assertThat(appContent).contains("import androidx.compose.ui.tooling.preview.Preview")
