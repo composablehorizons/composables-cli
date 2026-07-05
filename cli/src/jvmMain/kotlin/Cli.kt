@@ -482,7 +482,6 @@ class McpInstall : CliktCommand("install") {
         echoInstallResult("Antigravity", result)
       }
 
-      "claude-code",
       "claude" -> {
         val result = installClaudeCodeMcpServer(projectRoot = workingDir, overwrite = overwrite)
         echoInstallResult("Claude Code", result)
@@ -505,7 +504,7 @@ class McpInstall : CliktCommand("install") {
 
       else ->
           throw UsageError(
-              "Unsupported client '$client'. Available clients: android-studio, antigravity, claude-code, codex, cursor, opencode")
+              "Unsupported client '$client'. Available clients: android-studio, antigravity, claude, codex, cursor, opencode")
     }
   }
 
