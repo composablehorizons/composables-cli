@@ -494,37 +494,65 @@ class McpInstall : CliktCommand("install") {
       }
 
       "antigravity" -> {
-        val result = installAntigravityMcpServer(overwrite = overwrite)
+        val result =
+            installAntigravityMcpServer(
+                projectRoot = findRequiredMcpProjectRoot(workingDir),
+                overwrite = overwrite,
+            )
         echoInstallResult("Antigravity", result)
       }
 
       "claude" -> {
-        val result = installClaudeCodeMcpServer(projectRoot = workingDir, overwrite = overwrite)
+        val result =
+            installClaudeCodeMcpServer(
+                projectRoot = findRequiredMcpProjectRoot(workingDir),
+                overwrite = overwrite,
+            )
         echoInstallResult("Claude Code", result)
       }
 
       "codex" -> {
-        val result = installCodexMcpServer(projectRoot = workingDir, overwrite = overwrite)
+        val result =
+            installCodexMcpServer(
+                projectRoot = findRequiredMcpProjectRoot(workingDir),
+                overwrite = overwrite,
+            )
         echoInstallResult("Codex", result)
       }
 
       "cursor" -> {
-        val result = installCursorMcpServer(projectRoot = workingDir, overwrite = overwrite)
+        val result =
+            installCursorMcpServer(
+                projectRoot = findRequiredMcpProjectRoot(workingDir),
+                overwrite = overwrite,
+            )
         echoInstallResult("Cursor", result)
       }
 
       "firebender" -> {
-        val result = installFirebenderMcpServer(overwrite = overwrite)
+        val result =
+            installFirebenderMcpServer(
+                projectRoot = findRequiredMcpProjectRoot(workingDir),
+                overwrite = overwrite,
+            )
         echoInstallResult("Firebender", result)
       }
 
       "opencode" -> {
-        val result = installOpenCodeMcpServer(projectRoot = workingDir, overwrite = overwrite)
+        val result =
+            installOpenCodeMcpServer(
+                projectRoot = findRequiredMcpProjectRoot(workingDir),
+                overwrite = overwrite,
+            )
         echoInstallResult("OpenCode", result)
       }
 
       "zed" -> {
-        val result = installZedMcpServer(overwrite = overwrite)
+        val result =
+            installZedMcpServer(
+                projectRoot = findRequiredMcpProjectRoot(workingDir),
+                overwrite = overwrite,
+            )
         echoInstallResult("Zed", result)
       }
 
@@ -548,6 +576,22 @@ class McpInstall : CliktCommand("install") {
     }
   }
 }
+
+internal fun findGradleProjectRoot(start: File): File? {
+  var current: File? = start.absoluteFile
+  while (current != null) {
+    if (File(current, "settings.gradle.kts").isFile || File(current, "settings.gradle").isFile) {
+      return current
+    }
+    current = current.parentFile
+  }
+  return null
+}
+
+private fun findRequiredMcpProjectRoot(start: File): File =
+    findGradleProjectRoot(start)
+        ?: throw UsageError(
+            "Could not find a Gradle project root. Run this command from the root of your project.")
 
 class AddModule : CliktCommand("module") {
   override fun help(context: Context): String =
@@ -810,12 +854,12 @@ internal fun installAndroidStudioMcpServer(
 }
 
 internal fun installAntigravityMcpServer(
-    configFile: File = File(System.getProperty("user.home"), ".gemini/config/mcp_config.json"),
+    projectRoot: File,
     serverName: String = "composables",
     overwrite: Boolean = false,
 ): McpInstallResult =
     installJsonMcpServer(
-        configFile = configFile,
+        configFile = File(projectRoot, ".agents/mcp_config.json"),
         rootKey = "mcpServers",
         serverName = serverName,
         serverConfig = composablesStdioJsonConfig,
@@ -868,12 +912,12 @@ internal fun installOpenCodeMcpServer(
     )
 
 internal fun installFirebenderMcpServer(
-    configFile: File = File(System.getProperty("user.home"), ".firebender/firebender.json"),
+    projectRoot: File,
     serverName: String = "composables",
     overwrite: Boolean = false,
 ): McpInstallResult =
     installJsonMcpServer(
-        configFile = configFile,
+        configFile = File(projectRoot, "firebender.json"),
         rootKey = "mcpServers",
         serverName = serverName,
         serverConfig = composablesStdioJsonConfig,
@@ -882,30 +926,18 @@ internal fun installFirebenderMcpServer(
     )
 
 internal fun installZedMcpServer(
-    configFile: File = defaultZedSettingsFile(),
+    projectRoot: File,
     serverName: String = "composables",
     overwrite: Boolean = false,
 ): McpInstallResult =
     installJsonMcpServer(
-        configFile = configFile,
+        configFile = File(projectRoot, ".zed/settings.json"),
         rootKey = "context_servers",
         serverName = serverName,
         serverConfig = composablesStdioJsonConfig,
         clientName = "Zed",
         overwrite = overwrite,
     )
-
-internal fun defaultZedSettingsFile(appDataPath: String? = System.getenv("APPDATA")): File {
-  val homeDir = File(System.getProperty("user.home"))
-  return when {
-    isWindows() -> {
-      val appData = appDataPath?.takeIf { it.isNotBlank() }?.let(::File)
-      File(appData ?: File(homeDir, "AppData/Roaming"), "Zed/settings.json")
-    }
-    isMacOs() -> File(homeDir, ".zed/settings.json")
-    else -> File(homeDir, ".config/zed/settings.json")
-  }
-}
 
 private fun installJsonMcpServer(
     configFile: File,
