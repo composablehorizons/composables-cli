@@ -276,6 +276,8 @@ class CliIntegrationTest {
       assertThat(result.exitCode).isEqualTo(0)
       assertThat(result.output).contains("--client")
       assertThat(result.output).contains("--overwrite")
+      assertThat(result.output).contains("firebender")
+      assertThat(result.output).contains("zed")
     } finally {
       rootDir.deleteRecursively()
     }
@@ -298,6 +300,70 @@ class CliIntegrationTest {
       assertThat(result.exitCode).isEqualTo(0)
       assertThat(result.output).contains("Installed Composables MCP for Cursor.")
       val content = File(rootDir, ".cursor/mcp.json").readText()
+      assertThat(content).contains(""""command": "composables"""")
+      assertThat(content).contains(""""mcp"""")
+      assertThat(content).contains(""""start"""")
+    } finally {
+      rootDir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `cli mcp install writes firebender global config`() {
+    val rootDir = createTempRoot("composables-cli-mcp-install-firebender")
+    try {
+      val launcher = installedLauncher()
+
+      val result =
+          runProcess(
+              command = listOf(launcher.absolutePath, "mcp", "install", "--client", "firebender"),
+              workingDir = rootDir,
+              extraEnvironment =
+                  mapOf("JAVA_TOOL_OPTIONS" to "-Duser.home=${rootDir.absolutePath}"),
+              timeoutSeconds = 60,
+          )
+
+      assertThat(result.finished).isTrue()
+      assertThat(result.exitCode).isEqualTo(0)
+      assertThat(result.output).contains("Installed Composables MCP for Firebender.")
+      val content = File(rootDir, ".firebender/firebender.json").readText()
+      assertThat(content).contains(""""mcpServers"""")
+      assertThat(content).contains(""""command": "composables"""")
+      assertThat(content).contains(""""mcp"""")
+      assertThat(content).contains(""""start"""")
+    } finally {
+      rootDir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `cli mcp install writes zed global config`() {
+    val rootDir = createTempRoot("composables-cli-mcp-install-zed")
+    try {
+      val launcher = installedLauncher()
+
+      val result =
+          runProcess(
+              command =
+                  listOf(
+                      launcher.absolutePath,
+                      "mcp",
+                      "install",
+                      "--client",
+                      "zed",
+                  ),
+              workingDir = rootDir,
+              extraEnvironment =
+                  mapOf(
+                      "JAVA_TOOL_OPTIONS" to "-Duser.home=${rootDir.absolutePath} -Dos.name=Linux"),
+              timeoutSeconds = 60,
+          )
+
+      assertThat(result.finished).isTrue()
+      assertThat(result.exitCode).isEqualTo(0)
+      assertThat(result.output).contains("Installed Composables MCP for Zed.")
+      val content = File(rootDir, ".config/zed/settings.json").readText()
+      assertThat(content).contains(""""context_servers"""")
       assertThat(content).contains(""""command": "composables"""")
       assertThat(content).contains(""""mcp"""")
       assertThat(content).contains(""""start"""")
@@ -984,12 +1050,14 @@ class CliIntegrationTest {
       command: List<String>,
       workingDir: File,
       stdin: String = "",
+      extraEnvironment: Map<String, String> = emptyMap(),
       timeoutSeconds: Long,
   ): ProcessResult {
     val process =
         ProcessBuilder(platformCommand(command))
             .directory(workingDir)
             .redirectErrorStream(true)
+            .apply { environment().putAll(extraEnvironment) }
             .start()
 
     val output = StringBuilder()

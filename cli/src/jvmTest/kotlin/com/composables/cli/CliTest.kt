@@ -609,6 +609,37 @@ class CliTest {
   }
 
   @Test
+  fun `installFirebenderMcpServer writes global firebender config`() {
+    withTempDir { targetDir ->
+      val configFile = File(targetDir, "firebender.json")
+      val result = installFirebenderMcpServer(configFile = configFile)
+      val content = configFile.readText()
+
+      assertThat(result is McpInstallResult.Installed).isTrue()
+      assertThat(content).contains(""""mcpServers"""")
+      assertThat(content).contains(""""composables"""")
+      assertThat(content).contains(""""command": "composables"""")
+      assertThat(content).contains(""""mcp"""")
+      assertThat(content).contains(""""start"""")
+    }
+  }
+
+  @Test
+  fun `installZedMcpServer writes global zed context server config`() {
+    withTempDir { targetDir ->
+      val configFile = File(targetDir, "settings.json")
+      val result = installZedMcpServer(configFile = configFile)
+      val content = configFile.readText()
+
+      assertThat(result is McpInstallResult.Installed).isTrue()
+      assertThat(content).contains(""""context_servers"""")
+      assertThat(content).contains(""""composables"""")
+      assertThat(content).contains(""""command": "composables"""")
+      assertThat(content).contains(""""args": [""")
+    }
+  }
+
+  @Test
   fun `json mcp installers preserve existing servers and return already installed`() {
     withTempDir { projectRoot ->
       val configFile =
@@ -703,6 +734,60 @@ class CliTest {
       withOsName("Mac OS X") {
         withUserHome(homeDir.absolutePath) {
           assertThat(findAndroidStudioConfigDirectory()).isNull()
+        }
+      }
+    }
+  }
+
+  @Test
+  fun `installZedMcpServer uses mac global settings path`() {
+    withTempDir { homeDir ->
+      withOsName("Mac OS X") {
+        withUserHome(homeDir.absolutePath) {
+          val result = installZedMcpServer()
+
+          assertThat(result.configFile).isEqualTo(File(homeDir, ".zed/settings.json"))
+          assertThat(result.configFile).exists()
+        }
+      }
+    }
+  }
+
+  @Test
+  fun `installZedMcpServer uses linux global settings path`() {
+    withTempDir { homeDir ->
+      withOsName("Linux") {
+        withUserHome(homeDir.absolutePath) {
+          val result = installZedMcpServer()
+
+          assertThat(result.configFile).isEqualTo(File(homeDir, ".config/zed/settings.json"))
+          assertThat(result.configFile).exists()
+        }
+      }
+    }
+  }
+
+  @Test
+  fun `defaultZedSettingsFile uses windows appdata path`() {
+    withTempDir { homeDir ->
+      withOsName("Windows 11") {
+        withUserHome(homeDir.absolutePath) {
+          val appDataDir = File(homeDir, "AppData/Roaming")
+
+          assertThat(defaultZedSettingsFile(appDataPath = appDataDir.absolutePath))
+              .isEqualTo(File(appDataDir, "Zed/settings.json"))
+        }
+      }
+    }
+  }
+
+  @Test
+  fun `defaultZedSettingsFile uses windows home fallback when appdata is missing`() {
+    withTempDir { homeDir ->
+      withOsName("Windows 11") {
+        withUserHome(homeDir.absolutePath) {
+          assertThat(defaultZedSettingsFile(appDataPath = null))
+              .isEqualTo(File(homeDir, "AppData/Roaming/Zed/settings.json"))
         }
       }
     }

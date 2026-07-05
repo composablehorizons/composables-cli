@@ -442,6 +442,18 @@ class Mcp : CliktCommand("mcp") {
   }
 }
 
+private val supportedMcpInstallClients =
+    listOf(
+        "android-studio",
+        "antigravity",
+        "claude",
+        "codex",
+        "cursor",
+        "firebender",
+        "opencode",
+        "zed",
+    )
+
 class McpInstall : CliktCommand("install") {
   override fun help(context: Context): String =
       """
@@ -449,7 +461,11 @@ class McpInstall : CliktCommand("install") {
     """
           .trimIndent()
 
-  private val client by option("--client", help = "Client to install for").required()
+  private val client by
+      option(
+              "--client",
+              help = "Client to install for: ${supportedMcpInstallClients.joinToString()}")
+          .required()
   private val overwrite by
       option("--overwrite", help = "Overwrite an existing conflicting Composables MCP server entry")
           .flag(default = false)
@@ -497,14 +513,24 @@ class McpInstall : CliktCommand("install") {
         echoInstallResult("Cursor", result)
       }
 
+      "firebender" -> {
+        val result = installFirebenderMcpServer(overwrite = overwrite)
+        echoInstallResult("Firebender", result)
+      }
+
       "opencode" -> {
         val result = installOpenCodeMcpServer(projectRoot = workingDir, overwrite = overwrite)
         echoInstallResult("OpenCode", result)
       }
 
+      "zed" -> {
+        val result = installZedMcpServer(overwrite = overwrite)
+        echoInstallResult("Zed", result)
+      }
+
       else ->
           throw UsageError(
-              "Unsupported client '$client'. Available clients: android-studio, antigravity, claude, codex, cursor, opencode")
+              "Unsupported client '$client'. Available clients: ${supportedMcpInstallClients.joinToString()}")
     }
   }
 
@@ -840,6 +866,46 @@ internal fun installOpenCodeMcpServer(
         defaultRoot =
             buildJsonObject { put("\$schema", JsonPrimitive("https://opencode.ai/config.json")) },
     )
+
+internal fun installFirebenderMcpServer(
+    configFile: File = File(System.getProperty("user.home"), ".firebender/firebender.json"),
+    serverName: String = "composables",
+    overwrite: Boolean = false,
+): McpInstallResult =
+    installJsonMcpServer(
+        configFile = configFile,
+        rootKey = "mcpServers",
+        serverName = serverName,
+        serverConfig = composablesStdioJsonConfig,
+        clientName = "Firebender",
+        overwrite = overwrite,
+    )
+
+internal fun installZedMcpServer(
+    configFile: File = defaultZedSettingsFile(),
+    serverName: String = "composables",
+    overwrite: Boolean = false,
+): McpInstallResult =
+    installJsonMcpServer(
+        configFile = configFile,
+        rootKey = "context_servers",
+        serverName = serverName,
+        serverConfig = composablesStdioJsonConfig,
+        clientName = "Zed",
+        overwrite = overwrite,
+    )
+
+internal fun defaultZedSettingsFile(appDataPath: String? = System.getenv("APPDATA")): File {
+  val homeDir = File(System.getProperty("user.home"))
+  return when {
+    isWindows() -> {
+      val appData = appDataPath?.takeIf { it.isNotBlank() }?.let(::File)
+      File(appData ?: File(homeDir, "AppData/Roaming"), "Zed/settings.json")
+    }
+    isMacOs() -> File(homeDir, ".zed/settings.json")
+    else -> File(homeDir, ".config/zed/settings.json")
+  }
+}
 
 private fun installJsonMcpServer(
     configFile: File,
