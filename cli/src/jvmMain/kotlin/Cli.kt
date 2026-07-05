@@ -498,8 +498,7 @@ class McpInstall : CliktCommand("install") {
         echoInstallResult("Cursor", result)
       }
 
-      "opencode",
-      "open-code" -> {
+      "opencode" -> {
         val result = installOpenCodeMcpServer(projectRoot = workingDir, overwrite = overwrite)
         echoInstallResult("OpenCode", result)
       }
