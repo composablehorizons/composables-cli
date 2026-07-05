@@ -61,6 +61,7 @@ class CliIntegrationTest {
       assertThat(createResult.output)
           .contains("${projectGradleScript()} :desktopApp:hotRunJvm --auto")
       assertJvmReadme(projectDir)
+      assertGeneratedProjectHasGitignore(projectDir)
 
       val compileResult =
           runProcess(
@@ -1065,6 +1066,16 @@ class CliIntegrationTest {
         File(projectDir, "desktopApp/src/jvmMain/kotlin/com/example/sampleapp/main.kt").readText()
     assertThat(desktopMain)
         .contains("fun main() = singleWindowApplication(title = \"Sample App\") { App() }")
+  }
+
+  private fun assertGeneratedProjectHasGitignore(projectDir: File) {
+    val gitignore = File(projectDir, ".gitignore")
+    assertThat(gitignore.exists()).isTrue()
+
+    val content = gitignore.readText()
+    assertThat(content).contains(".idea")
+    assertThat(content).contains(".gradle")
+    assertThat(content).contains("**/build/")
   }
 
   private fun runProcess(
