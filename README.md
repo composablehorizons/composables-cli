@@ -1,3 +1,9 @@
+# The Repo has been merged to the [Composables UI monorepo](https://github.com/composablehorizons/composables-ui)
+
+This repo is now archived. Head over to the Composables UI repo for more details.
+
+---
+
 # Composables CLI
 
 A CLI for creating Compose Multiplatform apps with [Composables UI](https://composables.com/ui).
