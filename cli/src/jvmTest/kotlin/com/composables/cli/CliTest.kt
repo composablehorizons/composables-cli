@@ -553,10 +553,10 @@ class CliTest {
   }
 
   @Test
-  fun `installAntigravityMcpServer writes shared mcp config`() {
-    withTempDir { targetDir ->
-      val configFile = File(targetDir, "mcp_config.json")
-      val result = installAntigravityMcpServer(configFile = configFile)
+  fun `installAntigravityMcpServer writes workspace mcp config`() {
+    withTempDir { projectRoot ->
+      val result = installAntigravityMcpServer(projectRoot = projectRoot)
+      val configFile = File(projectRoot, ".agents/mcp_config.json")
 
       val content = configFile.readText()
       assertThat(result is McpInstallResult.Installed).isTrue()
@@ -609,10 +609,10 @@ class CliTest {
   }
 
   @Test
-  fun `installFirebenderMcpServer writes global firebender config`() {
-    withTempDir { targetDir ->
-      val configFile = File(targetDir, "firebender.json")
-      val result = installFirebenderMcpServer(configFile = configFile)
+  fun `installFirebenderMcpServer writes project firebender config`() {
+    withTempDir { projectRoot ->
+      val result = installFirebenderMcpServer(projectRoot = projectRoot)
+      val configFile = File(projectRoot, "firebender.json")
       val content = configFile.readText()
 
       assertThat(result is McpInstallResult.Installed).isTrue()
@@ -625,10 +625,10 @@ class CliTest {
   }
 
   @Test
-  fun `installZedMcpServer writes global zed context server config`() {
-    withTempDir { targetDir ->
-      val configFile = File(targetDir, "settings.json")
-      val result = installZedMcpServer(configFile = configFile)
+  fun `installZedMcpServer writes project zed context server config`() {
+    withTempDir { projectRoot ->
+      val result = installZedMcpServer(projectRoot = projectRoot)
+      val configFile = File(projectRoot, ".zed/settings.json")
       val content = configFile.readText()
 
       assertThat(result is McpInstallResult.Installed).isTrue()
@@ -714,6 +714,21 @@ class CliTest {
   }
 
   @Test
+  fun `findGradleProjectRoot walks up to settings file`() {
+    withTempDir { projectRoot ->
+      File(projectRoot, "settings.gradle.kts").writeText("""pluginManagement {}""")
+      val nested = File(projectRoot, "feature/chat/src").apply { mkdirs() }
+
+      assertThat(findGradleProjectRoot(nested)).isEqualTo(projectRoot.absoluteFile)
+    }
+  }
+
+  @Test
+  fun `findGradleProjectRoot returns null outside a Gradle project`() {
+    withTempDir { targetDir -> assertThat(findGradleProjectRoot(targetDir)).isNull() }
+  }
+
+  @Test
   fun `findAndroidStudioConfigDirectory selects latest mac config directory`() {
     withTempDir { homeDir ->
       File(homeDir, "Library/Application Support/Google/AndroidStudio2025.1").mkdirs()
@@ -734,60 +749,6 @@ class CliTest {
       withOsName("Mac OS X") {
         withUserHome(homeDir.absolutePath) {
           assertThat(findAndroidStudioConfigDirectory()).isNull()
-        }
-      }
-    }
-  }
-
-  @Test
-  fun `installZedMcpServer uses mac global settings path`() {
-    withTempDir { homeDir ->
-      withOsName("Mac OS X") {
-        withUserHome(homeDir.absolutePath) {
-          val result = installZedMcpServer()
-
-          assertThat(result.configFile).isEqualTo(File(homeDir, ".zed/settings.json"))
-          assertThat(result.configFile).exists()
-        }
-      }
-    }
-  }
-
-  @Test
-  fun `installZedMcpServer uses linux global settings path`() {
-    withTempDir { homeDir ->
-      withOsName("Linux") {
-        withUserHome(homeDir.absolutePath) {
-          val result = installZedMcpServer()
-
-          assertThat(result.configFile).isEqualTo(File(homeDir, ".config/zed/settings.json"))
-          assertThat(result.configFile).exists()
-        }
-      }
-    }
-  }
-
-  @Test
-  fun `defaultZedSettingsFile uses windows appdata path`() {
-    withTempDir { homeDir ->
-      withOsName("Windows 11") {
-        withUserHome(homeDir.absolutePath) {
-          val appDataDir = File(homeDir, "AppData/Roaming")
-
-          assertThat(defaultZedSettingsFile(appDataPath = appDataDir.absolutePath))
-              .isEqualTo(File(appDataDir, "Zed/settings.json"))
-        }
-      }
-    }
-  }
-
-  @Test
-  fun `defaultZedSettingsFile uses windows home fallback when appdata is missing`() {
-    withTempDir { homeDir ->
-      withOsName("Windows 11") {
-        withUserHome(homeDir.absolutePath) {
-          assertThat(defaultZedSettingsFile(appDataPath = null))
-              .isEqualTo(File(homeDir, "AppData/Roaming/Zed/settings.json"))
         }
       }
     }

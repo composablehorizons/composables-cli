@@ -288,11 +288,13 @@ class CliIntegrationTest {
     val rootDir = createTempRoot("composables-cli-mcp-install-cursor")
     try {
       val launcher = installedLauncher()
+      File(rootDir, "settings.gradle.kts").writeText("""pluginManagement {}""")
+      val nestedDir = File(rootDir, "features/chat").apply { mkdirs() }
 
       val result =
           runProcess(
               command = listOf(launcher.absolutePath, "mcp", "install", "--client", "cursor"),
-              workingDir = rootDir,
+              workingDir = nestedDir,
               timeoutSeconds = 60,
           )
 
@@ -309,24 +311,45 @@ class CliIntegrationTest {
   }
 
   @Test
-  fun `cli mcp install writes firebender global config`() {
-    val rootDir = createTempRoot("composables-cli-mcp-install-firebender")
+  fun `cli mcp install fails outside a Gradle project for project clients`() {
+    val rootDir = createTempRoot("composables-cli-mcp-install-no-project")
     try {
       val launcher = installedLauncher()
 
       val result =
           runProcess(
+              command = listOf(launcher.absolutePath, "mcp", "install", "--client", "cursor"),
+              workingDir = rootDir,
+              timeoutSeconds = 60,
+          )
+
+      assertThat(result.finished).isTrue()
+      assertThat(result.exitCode).isEqualTo(1)
+      assertThat(result.output).contains("Could not find a Gradle project root")
+      assertThat(result.output).contains("Run this command from the root of your project")
+    } finally {
+      rootDir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `cli mcp install writes firebender project config`() {
+    val rootDir = createTempRoot("composables-cli-mcp-install-firebender")
+    try {
+      val launcher = installedLauncher()
+      File(rootDir, "settings.gradle.kts").writeText("""pluginManagement {}""")
+
+      val result =
+          runProcess(
               command = listOf(launcher.absolutePath, "mcp", "install", "--client", "firebender"),
               workingDir = rootDir,
-              extraEnvironment =
-                  mapOf("JAVA_TOOL_OPTIONS" to "-Duser.home=${rootDir.absolutePath}"),
               timeoutSeconds = 60,
           )
 
       assertThat(result.finished).isTrue()
       assertThat(result.exitCode).isEqualTo(0)
       assertThat(result.output).contains("Installed Composables MCP for Firebender.")
-      val content = File(rootDir, ".firebender/firebender.json").readText()
+      val content = File(rootDir, "firebender.json").readText()
       assertThat(content).contains(""""mcpServers"""")
       assertThat(content).contains(""""command": "composables"""")
       assertThat(content).contains(""""mcp"""")
@@ -337,10 +360,11 @@ class CliIntegrationTest {
   }
 
   @Test
-  fun `cli mcp install writes zed global config`() {
+  fun `cli mcp install writes zed project config`() {
     val rootDir = createTempRoot("composables-cli-mcp-install-zed")
     try {
       val launcher = installedLauncher()
+      File(rootDir, "settings.gradle.kts").writeText("""pluginManagement {}""")
 
       val result =
           runProcess(
@@ -353,16 +377,13 @@ class CliIntegrationTest {
                       "zed",
                   ),
               workingDir = rootDir,
-              extraEnvironment =
-                  mapOf(
-                      "JAVA_TOOL_OPTIONS" to "-Duser.home=${rootDir.absolutePath} -Dos.name=Linux"),
               timeoutSeconds = 60,
           )
 
       assertThat(result.finished).isTrue()
       assertThat(result.exitCode).isEqualTo(0)
       assertThat(result.output).contains("Installed Composables MCP for Zed.")
-      val content = File(rootDir, ".config/zed/settings.json").readText()
+      val content = File(rootDir, ".zed/settings.json").readText()
       assertThat(content).contains(""""context_servers"""")
       assertThat(content).contains(""""command": "composables"""")
       assertThat(content).contains(""""mcp"""")
