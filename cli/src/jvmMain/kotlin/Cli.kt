@@ -26,6 +26,7 @@ import java.util.jar.JarFile
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -454,6 +455,7 @@ class McpInstall : CliktCommand("install") {
           .flag(default = false)
 
   override fun run() {
+    val workingDir = File(System.getProperty("user.dir"))
     when (client.trim().lowercase()) {
       "android-studio" -> {
         val configDir =
@@ -475,7 +477,48 @@ class McpInstall : CliktCommand("install") {
         }
       }
 
-      else -> throw UsageError("Unsupported client '$client'. Available clients: android-studio")
+      "antigravity" -> {
+        val result = installAntigravityMcpServer(overwrite = overwrite)
+        echoInstallResult("Antigravity", result)
+      }
+
+      "claude" -> {
+        val result = installClaudeCodeMcpServer(projectRoot = workingDir, overwrite = overwrite)
+        echoInstallResult("Claude Code", result)
+      }
+
+      "codex" -> {
+        val result = installCodexMcpServer(projectRoot = workingDir, overwrite = overwrite)
+        echoInstallResult("Codex", result)
+      }
+
+      "cursor" -> {
+        val result = installCursorMcpServer(projectRoot = workingDir, overwrite = overwrite)
+        echoInstallResult("Cursor", result)
+      }
+
+      "opencode" -> {
+        val result = installOpenCodeMcpServer(projectRoot = workingDir, overwrite = overwrite)
+        echoInstallResult("OpenCode", result)
+      }
+
+      else ->
+          throw UsageError(
+              "Unsupported client '$client'. Available clients: android-studio, antigravity, claude, codex, cursor, opencode")
+    }
+  }
+
+  private fun echoInstallResult(clientName: String, result: McpInstallResult) {
+    when (result) {
+      is McpInstallResult.AlreadyInstalled -> {
+        echo("Composables MCP is already installed for $clientName.")
+        echo("Using ${result.configFile.absolutePath}")
+      }
+
+      is McpInstallResult.Installed -> {
+        echo("Installed Composables MCP for $clientName.")
+        echo("Updated ${result.configFile.absolutePath}")
+      }
     }
   }
 }
@@ -654,6 +697,38 @@ internal sealed interface AndroidStudioMcpInstallResult {
   data class AlreadyInstalled(override val configFile: File) : AndroidStudioMcpInstallResult
 }
 
+internal sealed interface McpInstallResult {
+  val configFile: File
+
+  data class Installed(override val configFile: File) : McpInstallResult
+
+  data class AlreadyInstalled(override val configFile: File) : McpInstallResult
+}
+
+private val composablesStdioJsonConfig: JsonObject
+  get() = buildJsonObject {
+    put("command", "composables")
+    put(
+        "args",
+        buildJsonArray {
+          add(JsonPrimitive("mcp"))
+          add(JsonPrimitive("start"))
+        })
+  }
+
+private val composablesOpenCodeJsonConfig: JsonObject
+  get() = buildJsonObject {
+    put("type", "local")
+    put(
+        "command",
+        buildJsonArray {
+          add(JsonPrimitive("composables"))
+          add(JsonPrimitive("mcp"))
+          add(JsonPrimitive("start"))
+        })
+    put("enabled", JsonPrimitive(true))
+  }
+
 internal fun installAndroidStudioMcpServer(
     configDir: File,
     serverUrl: String,
@@ -706,6 +781,156 @@ internal fun installAndroidStudioMcpServer(
   }
   mcpConfigFile.writeText(json.encodeToString(JsonObject.serializer(), updatedRoot) + "\n")
   return AndroidStudioMcpInstallResult.Installed(mcpConfigFile)
+}
+
+internal fun installAntigravityMcpServer(
+    configFile: File = File(System.getProperty("user.home"), ".gemini/config/mcp_config.json"),
+    serverName: String = "composables",
+    overwrite: Boolean = false,
+): McpInstallResult =
+    installJsonMcpServer(
+        configFile = configFile,
+        rootKey = "mcpServers",
+        serverName = serverName,
+        serverConfig = composablesStdioJsonConfig,
+        clientName = "Antigravity",
+        overwrite = overwrite,
+    )
+
+internal fun installClaudeCodeMcpServer(
+    projectRoot: File,
+    serverName: String = "composables",
+    overwrite: Boolean = false,
+): McpInstallResult =
+    installJsonMcpServer(
+        configFile = File(projectRoot, ".mcp.json"),
+        rootKey = "mcpServers",
+        serverName = serverName,
+        serverConfig = composablesStdioJsonConfig,
+        clientName = "Claude Code",
+        overwrite = overwrite,
+    )
+
+internal fun installCursorMcpServer(
+    projectRoot: File,
+    serverName: String = "composables",
+    overwrite: Boolean = false,
+): McpInstallResult =
+    installJsonMcpServer(
+        configFile = File(projectRoot, ".cursor/mcp.json"),
+        rootKey = "mcpServers",
+        serverName = serverName,
+        serverConfig = composablesStdioJsonConfig,
+        clientName = "Cursor",
+        overwrite = overwrite,
+    )
+
+internal fun installOpenCodeMcpServer(
+    projectRoot: File,
+    serverName: String = "composables",
+    overwrite: Boolean = false,
+): McpInstallResult =
+    installJsonMcpServer(
+        configFile = File(projectRoot, "opencode.json"),
+        rootKey = "mcp",
+        serverName = serverName,
+        serverConfig = composablesOpenCodeJsonConfig,
+        clientName = "OpenCode",
+        overwrite = overwrite,
+        defaultRoot =
+            buildJsonObject { put("\$schema", JsonPrimitive("https://opencode.ai/config.json")) },
+    )
+
+private fun installJsonMcpServer(
+    configFile: File,
+    rootKey: String,
+    serverName: String,
+    serverConfig: JsonObject,
+    clientName: String,
+    overwrite: Boolean,
+    defaultRoot: JsonObject = JsonObject(emptyMap()),
+): McpInstallResult {
+  ensureConfigParentDirectory(configFile)
+  val existingRoot = readJsonObjectOrEmpty(configFile)
+  val baseRoot = buildJsonObject {
+    defaultRoot.forEach { (key, value) -> put(key, value) }
+    existingRoot.forEach { (key, value) -> put(key, value) }
+  }
+  val existingServers =
+      readNestedJsonObject(baseRoot, rootKey, configFile) ?: JsonObject(emptyMap())
+  val existingServer = existingServers[serverName]?.jsonObject
+
+  if (existingServer == serverConfig) {
+    return McpInstallResult.AlreadyInstalled(configFile)
+  }
+  if (existingServer != null && !overwrite) {
+    throw UsageError(
+        "$clientName already has a '$serverName' MCP server configured. Use --overwrite to replace it.")
+  }
+
+  val updatedServers = buildJsonObject {
+    existingServers.forEach { (key, value) -> put(key, value) }
+    put(serverName, serverConfig)
+  }
+  val updatedRoot = buildJsonObject {
+    baseRoot.forEach { (key, value) ->
+      if (key != rootKey) {
+        put(key, value)
+      }
+    }
+    put(rootKey, updatedServers)
+  }
+
+  configFile.writeText(json.encodeToString(JsonObject.serializer(), updatedRoot) + "\n")
+  return McpInstallResult.Installed(configFile)
+}
+
+internal fun installCodexMcpServer(
+    projectRoot: File,
+    serverName: String = "composables",
+    overwrite: Boolean = false,
+): McpInstallResult {
+  val configFile = File(projectRoot, ".codex/config.toml")
+  ensureConfigParentDirectory(configFile)
+  val content = if (configFile.exists()) configFile.readText() else ""
+  val sectionHeader = "[mcp_servers.$serverName]"
+  val sectionRegex = Regex("""(?ms)^${Regex.escape(sectionHeader)}\s*\n.*?(?=^\[|\z)""")
+  val existingSection = sectionRegex.find(content)?.value?.trim()
+  val desiredSection =
+      """
+        $sectionHeader
+        command = "composables"
+        args = ["mcp", "start"]
+      """
+          .trimIndent()
+
+  if (existingSection == desiredSection) {
+    return McpInstallResult.AlreadyInstalled(configFile)
+  }
+  if (existingSection != null && !overwrite) {
+    throw UsageError(
+        "Codex already has a '$serverName' MCP server configured. Use --overwrite to replace it.")
+  }
+
+  val contentWithoutSection = sectionRegex.replace(content, "").trimEnd()
+  val updatedContent =
+      if (contentWithoutSection.isEmpty()) {
+        desiredSection
+      } else {
+        "$contentWithoutSection\n\n$desiredSection"
+      }
+  configFile.writeText("$updatedContent\n")
+  return McpInstallResult.Installed(configFile)
+}
+
+private fun ensureConfigParentDirectory(configFile: File) {
+  val parent = configFile.parentFile ?: return
+  if (parent.exists() && !parent.isDirectory) {
+    throw UsageError("Config path ${parent.absolutePath} is not a directory.")
+  }
+  if (!parent.exists() && !parent.mkdirs()) {
+    throw UsageError("Failed to create config directory at ${parent.absolutePath}")
+  }
 }
 
 internal fun findAndroidStudioConfigDirectory(): File? {
