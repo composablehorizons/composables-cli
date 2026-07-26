@@ -1,0 +1,15 @@
+{
+  "name": "cloudflare-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "cloudflare-cli": "./bin/cloudflare-cli.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
