@@ -1,6 +1,8 @@
-# The Repo has been merged to the [Composables UI monorepo](https://github.com/composablehorizons/composables-ui)
+# This CLI is deprecated. Use the new [Composables CLI](https://composables.com/docs/cli)
 
-This repo is now archived. Head over to the Composables UI repo for more details.
+The new Composables CLI adds ready-made flows, screens, components and icons to your Jetpack Compose and Compose Multiplatform projects. See [composables.com/docs/cli](https://composables.com/docs/cli) to install it.
+
+This repository and its `composables-cli` npm package are no longer maintained.
 
 ---
 
